@@ -1,0 +1,181 @@
+\documentclass{template}
+\title{Synthetic Acceleration for Radiative Diffusion Calculations\\
+  \large Notes on Morel, Larsen, Matzen 1985 \cite{morel1985synthetic}}
+
+\author{Kyle Hansen}
+\date{10 October 2025}
+
+\usepackage{cancel}
+\newcommand*\multbox[1]{\fbox{\hspace{0ex}#1\hspace{0ex}}}
+
+
+
+\begin{document}
+
+\maketitle
+
+\section{Radiative Diffusion Equations}
+
+The radiative diffusion equations are:
+
+\begin{gather}
+\label{eq:spectral_temperature}
+\rho C_v \frac{\partial T}{\partial t} = \nabla \cdot K \nabla T - \nabla {\mathbb{P}u} + \rho \int_0^\infty \kappa(E^\prime)\left[ I(E^\prime) - \beta(E^\prime, T) \right] dE^\prime + Q\\
+\label{eq:spectral_diffusion}
+\frac{1}{c}\frac{\partial I}{\partial t} - \nabla \cdot D(E) \nabla I(E) + \rho \kappa(E)I(E) = \rho\kappa(E)\beta(E, T), 
+\end{gather}
+
+where $t$ is time, $\vec{r}$ is position, $E = h\nu$ is photon energy, $C_v$ is material specific heat, $K$ is thermal conductivity, $\mathbb{P}$ is the pressure tensor (from both material and radiation pressure), $u$ is material velocity, $\kappa$ is specific absorption opacity in units of $[\text{area}/\text{mass}]$, $\rho$ is material density, $D$ is the photon diffusion coefficient, $T$ is material temperature, $I(\vec{r}, E) = \int d\Omega \; I(x, \Omega, E)$ is photon intensity in units of $[\text{energy}/\text{area}\cdot\text{time}]$, and $Q$ is material energy source.
+
+Integrating \autoref{eq:spectral_temperature} and \autoref{eq:spectral_diffusion} over $N_g$ energy groups yields the multigroup radiative diffusion equations:
+
+\begin{gather}
+  \label{eq:multigroup_temperature}
+  \rho C_v \frac{\partial T}{\partial t} = \nabla \cdot K \nabla T - \nabla {\mathbb{P}u} + \rho \sum_{g=1}^{N_g} \kappa_g \left[ I_g - \beta_g(T) \right] + Q\\
+  \label{eq:multigroup_diffusion}
+  \frac{1}{c}\frac{\partial I_k}{\partial t} - \nabla \cdot D_k \nabla I_k + \rho \kappa_k I_k = \rho\kappa_k \beta_k(T); \qquad k=1\dots N_g
+\end{gather}
+
+where
+
+\begin{subequations}
+  \begin{align}
+    \int_k \cdot \; dE &= \int_{E_k}^{E_{k+1}}\cdot\; dE\\
+    I_k &= \int_k I(E) dE\\
+    \beta_k(T) &= \int_k \beta(E, T) dE\\
+    D_k \nabla I_k &= \int_k D(E) \nabla I(E) dE\\
+    \kappa_k &= \frac{\int_g \kappa(E) \left[ \beta(E) - I(E) \right] dE}{\int_g \left[ \beta(E) - I(E) \right] dE}
+  \end{align}
+\end{subequations}
+
+
+where the multigroup equations are only exact if the $E$-spectrum is known exactly within each energy group, though the approximation is close to exact when the number of energy groups is high. Rosseland- or Planck-weighted group constants are used to approximate the spectrum. Pressure $\mathbb{P}$, material velocity $\vec{u}$, and density $\rho$ are taken to be known exactly, since they come from hydrodynamic equations.
+
+Discretizing in time with Backward Euler and using lagged opacity, thermal conductivity, diffusion coefficient, and heat capacity:
+
+\begin{gather}
+  \rho C_v^n \frac{T^{n+1} - T^n}{\Delta t^n} = \nabla \cdot K^n \nabla T^{n+1} - \nabla {\mathbb{P}u} + \rho \sum_{g=1}^{N_g} \kappa_g^n \left[ I_g^{n+1} - \beta_g^{n+1}(T) \right] + Q^{n+1}\\
+  \frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \rho \kappa_k^n \beta_k(T(t)); \qquad k=1\dots N_g
+\end{gather}
+
+Then, the time advancement of $\beta$ can be approximated using a first-order Taylor expansion, $\beta_k^{n+1} \approx \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}$, and the temperature operator is split into two parts-- radiative/inhomogenous source and thermal conductivity/pressure. The linearized, time-discretized equations are:
+
+
+  \begin{gather}
+    \label{eq:MEB}\rho C_v^n \frac{\Delta T^{n+1/2}}{\Delta t^n} =  \rho \sum_{g=1}^{N_g} \kappa_g^n \left[ I_g^{n+1} - \left( \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}\right) \right] + Q^{n+1}\\
+    \label{eq:intermediate_intensity}\frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \rho \kappa_k^n \left( \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}\right); \qquad k=1\dots N_g\\
+    \rho C_v^n \frac{\Delta T^{n+1}}{\Delta t^n} = \nabla \cdot K^n \nabla T^{n+1} - \nabla \cdot {\mathbb{P}u}
+  \end{gather}
+
+
+
+
+Where $\Delta T^{n+1/2}$ is an intermediate value for the temperature at $t^{n+1}$, not at an intermediate time step, and $T^{n+1/2} = T^n + \Delta T^{n+1/2}$ and $T^{n+1} = T^{n+1/2} + \Delta T^{n+1}$. $\Delta T^{n+1/2}$ can be easily evaluated algebraically from \autoref{eq:MEB}:
+
+\begin{equation}
+  \label{eq:intermediate_temperature}\Delta T^{n+1/2} = \left[    \sum_{g=1}^{N_g} \kappa_g^n \left( I_g^{n+1} -  \beta_k^n  \right) +  \frac{Q^{n+1}}{\rho}    \right] \cdot \left[  \frac{ C_v^n}{\Delta t^n}  + \sum_{g=1}^{N_g}\kappa_g^n \frac{\partial \beta_g^n}{\partial T}\right]^{-1}
+\end{equation}
+
+Evaluating \autoref{eq:intermediate_intensity} using \autoref{eq:intermediate_temperature} yields
+
+% TODO
+\begin{equation}
+  \frac{1}{c \Delta t^n}\left( I^{n+1} - I^n \right)- \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \dots TODO
+\end{equation}
+
+which reduces to the final form of the multigroup diffusion equation,
+
+\begin{equation}\label{eq:standard_diffusion}
+  \frac{1}{c \Delta t^n}\left( I^{n+1} - I^n \right)- \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \eta \chi_k \rho \sum_{g=1}^{N_g}\kappa_g I_g^{n+1} + q_k
+\end{equation}
+
+where
+\begin{subequations}
+  \begin{align}
+    \eta   &=  \left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right] \cdot \left[ \frac{C_v}{\Delta t^n} + \sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T} \right]^{-1} \\
+    \chi_k &=  \left[ \kappa_k  \frac{\partial \beta_k}{\partial T}   \right] \cdot \left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right]^{-1} \\
+    q_k    &=  \rho \kappa_k \beta_k  +  \eta \chi_k \left[ Q - \rho \sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T} \right]
+  \end{align}
+\end{subequations}
+
+
+\autoref{eq:standard_diffusion} resembles the steady-state neutron diffusion equation, which can be made clear by further rearranging the terms:
+
+\begin{equation}\label{eq:neutron_diffusion}
+  -\nabla \cdot D_k \nabla I_k^{n+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{n+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^{n+1} + S_k
+\end{equation}
+
+where
+
+\begin{subequations}
+  \begin{align}
+  \sigma_a     &= \frac{1}{c\Delta t^n}\\
+  \sigma_{f, k} &= \rho \kappa_k\\
+  S_k &= q_k + \frac{I_k^n}{c\Delta t^n}
+\end{align}
+\end{subequations}
+
+with ``fission" and ``absorption" cross sections, and fission emission spectrum $\chi_k$. 
+
+\subsection{Iterative solution}\label{sec:iterative_solution}
+
+\autoref{eq:neutron_diffusion} can be solved by source iteration, starting from some initial guess $I_{k}^{(0)}$ and using to compute the next iterate $I^{(1)}$, or using each iterate $I_{k}^{l}$ to compute $I_{k}^{l+1}$. Surpressing the $n+1$ index, the iterative equation is
+
+\begin{equation}
+  -\nabla \cdot D_k \nabla I_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k
+\end{equation}
+
+\section{Acceleration Scheme}
+
+The iterative method described in \autoref{sec:iterative_solution} can be written in operator notation as the solution to the linear system
+
+\begin{equation}
+  \mathcal{M}x = y,
+\end{equation}
+
+where the exact solution is denoted as $x^\star$. The solution is solved iteratively by splitting the operator $\mathcal{M} = \mathcal{A} - \mathcal{B}$, and $\mathcal{A}$ is easily inverted. The iterative method is then
+
+\begin{align}
+  \mathcal{A}x^{l+1} &= \mathcal{B}x^l + y\\
+  x^{l+1} &=  \mathcal{A}^{-1} \mathcal{B}x^l + \mathcal{A}^{-1}y.
+\end{align}
+
+For the radiative diffusion equation (\autoref{eq:neutron_diffusion}), $\mathcal{A}$ is the streaming and absorption operator, and $\mathcal{B}$ is the ``fission'' source. The error of the $(l+1)$th iterate is
+
+\begin{equation}
+  \epsilon^{l+1} = x^\star - x^{l+1}
+\end{equation}
+
+Then the exact solution can be found from the $(l+1)$th iterate using
+
+\begin{subequations}
+  \begin{align}
+  \mathcal{B}x^l + y &= \mathcal{A}x^{l+1}\\
+  y & = \mathcal{A}x^{l+1} - \mathcal{B}x^l\\
+  \mathcal{M}x^\star &= \mathcal{A}x^{l+1} - \mathcal{B}x^l\\
+  x^\star &= \mathcal{M}^{-1} \left(\mathcal{A}x^{l+1} - \mathcal{B}x^l \right)\\
+          &= \mathcal{M}^{-1} \left(\mathcal{A}x^{l+1} - \mathcal{B}x^{l+1}+\mathcal{B}x^{l+1}- \mathcal{B}x^l \right)\\
+          &= \mathcal{M}^{-1} \left(\mathcal{M}x^{l+1} +\mathcal{B}{\left( x^{l+1}- x^l \right) }\right)\\
+          \label{eq:exact_iterative}x^\star &=  x^{l+1} + \mathcal{M}^{-1}\mathcal{B}{\left( x^{l+1}- x^l \right)} = x^{l+1} + \epsilon^{l+1}
+  \end{align}
+\end{subequations}
+
+The iteration can be accelerated by evaluating \autoref{eq:exact_iterative} using an approximation $\mathcal{W} \approx \mathcal{M}$, which can be more easily inverted. Here $\mathcal{M}$ is called the high-order operator, and $\mathcal{W}$ is the low-order operator.
+
+The accelerated iteration scheme is
+
+\begin{align}
+  x^{l+1/2} &=  \mathcal{A}^{-1} \mathcal{B}x^l + \mathcal{A}^{-1}y\\
+  x^{l+1}   &=  x^{l+1/2} + \mathcal{W}^{-1}\mathcal{B}{\left( x^{l+1}- x^l \right)}
+\end{align}
+
+
+
+
+\cite{fleck1971implicit}
+
+\bibliographystyle{ieeetr}
+\bibliography{references.bib}
+
+
+\end{document}
