@@ -107,7 +107,7 @@ where
 
 where
 
-\begin{subequations}
+\begin{subequations}\label{eq:neutron_xs}
   \begin{align}
   \sigma_a     &= \frac{1}{c\Delta t^n}\\
   \sigma_{f, k} &= \rho \kappa_k\\
@@ -115,13 +115,13 @@ where
 \end{align}
 \end{subequations}
 
-with ``fission" and ``absorption" cross sections, and fission emission spectrum $\chi_k$. 
+with ``fission" and ``absorption" cross sections, and fission emission spectrum $\chi_k$. The fission term will be known as the reimission term.
 
 \subsection{Iterative solution}\label{sec:iterative_solution}
 
 \autoref{eq:neutron_diffusion} can be solved by source iteration, starting from some initial guess $I_{k}^{(0)}$ and using to compute the next iterate $I^{(1)}$, or using each iterate $I_{k}^{l}$ to compute $I_{k}^{l+1}$. Surpressing the $n+1$ index, the iterative equation is
 
-\begin{equation}
+\begin{equation}\label{eq:iterative_neutron}
   -\nabla \cdot D_k \nabla I_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k
 \end{equation}
 
@@ -140,7 +140,7 @@ where the exact solution is denoted as $x^\star$. The solution is solved iterati
   x^{l+1} &=  \mathcal{A}^{-1} \mathcal{B}x^l + \mathcal{A}^{-1}y.
 \end{align}
 
-For the radiative diffusion equation (\autoref{eq:neutron_diffusion}), $\mathcal{A}$ is the streaming and absorption operator, and $\mathcal{B}$ is the ``fission'' source. The error of the $(l+1)$th iterate is
+For the radiative diffusion equation (\autoref{eq:neutron_diffusion}), $\mathcal{A}$ is the streaming and absorption operator, and $\mathcal{B}$ is the reemission (``fission'') source. The error of the $(l+1)$th iterate is
 
 \begin{equation}
   \epsilon^{l+1} = x^\star - x^{l+1}
@@ -168,6 +168,33 @@ The accelerated iteration scheme is
   x^{l+1/2} &=  \mathcal{A}^{-1} \mathcal{B}x^l + \mathcal{A}^{-1}y\\
   x^{l+1}   &=  x^{l+1/2} + \mathcal{W}^{-1}\mathcal{B}{\left( x^{l+1}- x^l \right)}
 \end{align}
+
+when solving the radiative diffusion equation, the high-order operator $\mathcal{M}$ is the system of multigroup diffusion equations. The acceleerated scheme presented in \cite{morel1985synthetic} uses a one-group diffusion operator as the low-order operator $\mathcal{W}$.
+
+Fourier analyis of the high-order equation shows that the slowest-converging mode is ${\omega(\lambda=0)}$, or
+
+\begin{equation}
+  \omega_{\max} = \omega(0) = \eta \sum_{g=1}^{N_g} \frac{\chi_g \sigma_{f,g}}{\sigma_a + \sigma_{f,g}}
+\end{equation}
+
+Where $\omega_{\max}$ approaches $1$ as the $\Delta t^n$ is increased. For small time steps, $\omega_{\max} \approx \eta$, which approaches unity for strongly coupled problems, where $C_v$ is small or $\kappa$ is large.
+
+The most effective acceleration schemes should approximate the high-order equations accurately about $\lambda = 0$. This solution corresponds with an equilibrium solution, which will be the focus of the low-order equation. \autoref{sec:fourier_analysis} details the derivation of this result.
+
+The multigroup equation for the error of the $(l+1/2)$th iterate of \autoref{eq:iterative_neutron} is
+
+\begin{equation}
+  -\nabla \cdot D_k\nabla \epsilon_k^{l+1/2} + \left(\sigma_a + \sigma_{f, k}\right)\epsilon_k^{l+1/2} = \eta \chi_k \sum_{g=1}^{N_g} \sigma_{f, g} \left[ \epsilon_g^l + I_g^{l-1} \right]; \; k=1, 2,\dots, N_g
+\end{equation}
+
+In the equilibrium limit, where the gradient term becomes zero, this equation becomes
+
+\begin{equation}
+  
+\end{equation}
+
+
+\section{Fourier Analysis}\label{sec:fourier_analysis}
 
 
 
