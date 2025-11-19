@@ -6,6 +6,16 @@
 \date{10 October 2025}
 
 \usepackage{cancel}
+
+
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+
+\newcommand*\Let[2]{\State #1 $\gets$ #2}
+\algrenewcommand\algorithmicrequire{\textbf{Precondition:}}
+\algrenewcommand\algorithmicensure{\textbf{Postcondition:}}
+
+
 \newcommand*\multbox[1]{\fbox{\hspace{0ex}#1\hspace{0ex}}}
 
 
@@ -49,7 +59,7 @@ where
 \end{subequations}
 
 
-where the multigroup equations are only exact if the $E$-spectrum is known exactly within each energy group, though the approximation is close to exact when the number of energy groups is high. Rosseland- or Planck-weighted group constants are used to approximate the spectrum. Pressure $\mathbb{P}$, material velocity $\vec{u}$, and density $\rho$ are taken to be known exactly, since they come from hydrodynamic equations.
+where the multigroup equations are only exact if the $E$-spectrum is known exactly within each energy group, though the approximation is close to exact when the number of energy groups is high. Rosseland- or Planck-weighted group constants are used to approximate the spectrum. Pressure $\mathbb{P}$, material velocity $\vec{u}$, thermal conductivity $K$, and density $\rho$ are taken to be known exactly, since they come from hydrodynamic equations.
 
 Discretizing in time with Backward Euler and using lagged opacity, thermal conductivity, diffusion coefficient, and heat capacity:
 
@@ -117,7 +127,8 @@ where
 
 with ``fission" and ``absorption" cross sections, and fission emission spectrum $\chi_k$. The fission term will be known as the reimission term.
 
-\subsection{Iterative solution}\label{sec:iterative_solution}
+\subsection{Iterative solution}
+\label{sec:iterative_solution}
 
 \autoref{eq:neutron_diffusion} can be solved by source iteration, starting from some initial guess $I_{k}^{(0)}$ and using to compute the next iterate $I^{(1)}$, or using each iterate $I_{k}^{l}$ to compute $I_{k}^{l+1}$. Surpressing the $n+1$ index, the iterative equation is
 
@@ -166,7 +177,7 @@ The accelerated iteration scheme is
 
 \begin{align}
   x^{l+1/2} &=  \mathcal{A}^{-1} \mathcal{B}x^l + \mathcal{A}^{-1}y\\
-  x^{l+1}   &=  x^{l+1/2} + \mathcal{W}^{-1}\mathcal{B}{\left( x^{l+1}- x^l \right)}
+  x^{l+1}   &=  x^{l+1/2} + \mathcal{W}^{-1}\mathcal{B}{\left( x^{l+1/2}- x^l \right)}
 \end{align}
 
 when solving the radiative diffusion equation, the high-order operator $\mathcal{M}$ is the system of multigroup diffusion equations. The acceleerated scheme presented in \cite{morel1985synthetic} uses a one-group diffusion operator as the low-order operator $\mathcal{W}$.
@@ -181,18 +192,181 @@ Where $\omega_{\max}$ approaches $1$ as the $\Delta t^n$ is increased. For small
 
 The most effective acceleration schemes should approximate the high-order equations accurately about $\lambda = 0$. This solution corresponds with an equilibrium solution, which will be the focus of the low-order equation. \autoref{sec:fourier_analysis} details the derivation of this result.
 
-The multigroup equation for the error of the $(l+1/2)$th iterate of \autoref{eq:iterative_neutron} is
+The multigroup equation for the error of the $l$th iterate of \autoref{eq:iterative_neutron} is
 
 \begin{equation}
-  -\nabla \cdot D_k\nabla \epsilon_k^{l+1/2} + \left(\sigma_a + \sigma_{f, k}\right)\epsilon_k^{l+1/2} = \eta \chi_k \sum_{g=1}^{N_g} \sigma_{f, g} \left[ \epsilon_g^l + I_g^{l-1} \right]; \; k=1, 2,\dots, N_g
+  \label{eq:error-diffusion-equation}-\nabla \cdot D_k\nabla \epsilon_k^{l} + \left(\sigma_a + \sigma_{f, k}\right)\epsilon_k^{l} = \eta \chi_k \sum_{g=1}^{N_g} \sigma_{f, g} \left[ \epsilon_g^{l} +I_g^{l} - I_g^{l-1} \right]; \; k=1, 2,\dots, N_g
 \end{equation}
 
 In the equilibrium limit, where the gradient term becomes zero, this equation becomes
 
+\begin{align}
+  \left(\sigma_a + \sigma_{f, k} \right)\epsilon_k^l &= \eta\chi_k \sum_{g=1}^{N_G}\sigma_{f, g}\epsilon_g^l + \eta\chi_k \sum_{g=1}^{N_G}\sigma_{f, g}\left(I_g^l - I_g^{l-1} \right)\\
+  \sigma_{t, k}\epsilon_k^l &= \eta\chi_k \left( \xi^l + r^l \right)\\
+  \epsilon_k^l &= \frac{\eta\chi_k}{\sigma_{t, k}} \left( \xi^l + r^l \right)\label{eq:first-step-eq-spectrum}
+\end{align}
+
+where
+\begin{align}
+  \sigma_{t, k} &= \sigma_a + \sigma_{f, k}\\
+  r^l &= \sum_{g=1}^{N_G}\sigma_{f, g}\left(I_g^l - I_g^{l-1} \right)\\
+  \xi^l &= \sum_{g=1}^{N_G}\sigma_{f, g}\epsilon_g^l
+\end{align}
+
+then, to solve for $\xi^i$, \autoref{eq:first-step-eq-spectrum} is multiplied by $\sigma_{f, k}$ and summed over all $k$:
+
+\begin{align}
+  \sum_{k=1}^{N_g} \sigma_{f, k}\epsilon_k^l &= \sum_{k=1}^{N_g} \sigma_{f, k}\frac{\eta\chi_k}{\sigma_{t, k}} \left( \xi^l + r^l \right)\\
+  \xi^l &= \eta \left( \xi^l + r^l \right) \sum_{k=1}^{N_g}\frac{ \chi_k \sigma_{f,k}}{\sigma_{t, k}}\\
+  \xi^l &= \eta \left( \xi^l + r^l \right) \frac{\langle \sigma_f \rangle}{\langle \sigma_t \rangle}\label{eq:second-step-eq-spectrum}
+\end{align}
+
+where
+
+\begin{align}
+  \langle \sigma_f \rangle &= \langle \sigma_t \rangle \sum_{g=1}^{N_g} \frac{\chi_g \sigma_{f, g}}{\sigma{t, g}}\\
+  \langle \sigma_t \rangle &= \left[\sum_{g=1}^{N_g} \frac{\chi_g}{\sigma_{t, g}} \right]^{-1}
+\end{align}
+
+then \autoref{eq:second-step-eq-spectrum} can be solved for $\xi^l$,
+
+\begin{subequations}
+  \begin{align}
+  \xi^l &= \eta \left( \xi^l + r^l \right) \frac{\langle \sigma_f \rangle}{\langle \sigma_t \rangle}\\
+  \frac{\xi^l\langle \sigma_t \rangle}{\eta \langle \sigma_f \rangle} &= \left( \xi^l + r^l \right)\\
+  \xi^l &= \frac{r^l}{\frac{\langle \sigma_t \rangle}{\eta \langle \sigma_f \rangle} - 1}\\
+  \xi^l &= \frac{\eta \langle \sigma_f \rangle r^l}{\langle \sigma_t \rangle - \eta \langle \sigma_f \rangle}
+\end{align}
+\end{subequations}
+
+
+yielding the final equilibrium solution of the $l$th iterate error, 
+
+\begin{subequations}
+  \begin{align}
+    \epsilon_k^l &= \frac{\eta\chi_k}{\sigma_{t, k}} \left( \xi^l + r^l \right)\\
+    \sigma_{t, k} &= \sigma_a + \sigma_{f, k}\\
+  r^l &= \sum_{g=1}^{N_G}\sigma_{f, g}\left(I_g^l - I_g^{l-1} \right)\\
+  \xi^l &= \frac{\eta \langle \sigma_f \rangle r^l}{\langle \sigma_t \rangle - \eta \langle \sigma_f \rangle}\\
+  \langle \sigma_f \rangle &= \langle \sigma_t \rangle \sum_{g=1}^{N_g} \frac{\chi_g \sigma_{f, g}}{\sigma{t, g}}\\
+  \langle \sigma_t \rangle &= \left[\sum_{g=1}^{N_g} \frac{\chi_g}{\sigma_{t, g}} \right]^{-1}
+  \end{align}
+\end{subequations}
+
+Then the specral shape (normalized) of this solution, where $E^l = \sum_{g=1}^{N_g}\epsilon_k^l$, is
+
+\begin{subequations}
+  \begin{align}
+  \frac{\epsilon_k^l}{E^l} &= \frac{\frac{\eta\chi_k}{\sigma_{t, k}} \left( \xi^l + r^l \right)}{\sum_{g=1}^{N_g}\frac{\eta\chi_g}{\sigma_{t, g}} \left( \xi^l + r^l \right)}\\
+  &= \frac{\cancel{\eta\left( \xi^l + r^l \right)}\frac{\chi_k}{\sigma_{t, k}} }{\cancel{\eta\left( \xi^l + r^l \right)}\sum_{g=1}^{N_g}\frac{\chi_g}{\sigma_{t, g}} }\\
+  &= \frac{\frac{\chi_k}{\sigma_{t, k}} }{\sum_{g=1}^{N_g}\frac{\chi_g}{\sigma_{t, g}} }\\
+  \frac{\epsilon_k^l}{E^l} &= \frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}.\label{eq:error-spectral-shape}
+\end{align}
+\end{subequations}
+
+
+Which is exact as the time step $\Delta t$ approaches infinity (in the equilibrium limit), and is equivalent to the spectral shape used to evaluate Rosseland group opacities. Then, evaluating \autoref{eq:error-diffusion-equation} using the assumed spectral shape,
+
+\begin{align}
+  -\nabla \cdot D_k\nabla E^l\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} + \left(\sigma_a + \sigma_{f, k}\right)E^l\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} =\eta \chi_k r^l + \eta \chi_k \sum_{g=1}^{N_g} \sigma_{f, g} E^l\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}.
+\end{align}
+
+Expanding the diffusion term using the product rule,
+
+
+  \begin{multline}
+  -\nabla \cdot \left[D_k \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} \nabla E^l     +    D_k E^l \nabla   \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}     \right]  + \left(\sigma_a + \sigma_{f, k}\right)E^l\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} =\\
+  \eta \chi_k r^l + \eta \chi_k \sum_{g=1}^{N_g} \sigma_{f, g} E^l\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}.
+\end{multline}
+
+
+
+Summing over all groups, 
+
+\begin{multline}
+  -\nabla \cdot \left[\left( \sum_{k=1}^{N_g}D_k \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}\right) \nabla E^l     +   E^l \left( \sum_{k=1}^{N_g} D_k  \nabla   \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} \right)    \right]  + E^l \sum_{k=1}^{N_g}\left(\sigma_a + \sigma_{f, k}\right)\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} =\\
+  \eta  r^l + \sum_{k=1}^{N_g}\eta E^l  \chi_k  \langle \sigma_t \rangle \sum_{g=1}^{N_g} \sigma_{f, g} \frac{  \chi_g}{\sigma_{t, g}}
+\end{multline}
+
+\begin{multline}
+  -\nabla \cdot \left[\left( \sum_{k=1}^{N_g}D_k \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}\right) \nabla E^l     +   E^l \left( \sum_{k=1}^{N_g} D_k  \nabla   \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} \right)    \right]  + E^l \sum_{k=1}^{N_g}\left(\sigma_a + \sigma_{f, k}\right)\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} =\\
+  \eta  r^l + \eta E^l   \langle \sigma_f \rangle,
+\end{multline}
+
+which can be written as
+
 \begin{equation}
-  
+  -\nabla \cdot \left[\langle D \rangle \nabla E^l     +  \langle D^\prime \rangle  E^l    \right]  + E^l \sum_{k=1}^{N_g}\left(\sigma_a + \sigma_{f, k}\right)\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} =  \eta  r^l + \eta E^l   \langle \sigma_f \rangle,
 \end{equation}
 
+where
+
+\begin{subequations}
+ \begin{align}
+  \langle D \rangle &= \sum_{k=1}^{N_g}D_k \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}  \\
+  \langle D^\prime \rangle &= \sum_{k=1}^{N_g} D_k  \nabla   \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}.
+\end{align} 
+\end{subequations}
+
+
+Expanding the removal term, 
+
+\begin{subequations}
+  \begin{align}
+  E^l \sum_{k=1}^{N_g}\left(\sigma_a + \sigma_{f, k}\right)\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} & =  \sigma_a \sum_{k=1}^{N_g}E^l\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} + \sum_{k=1}^{N_g} E^l\frac{ \langle \sigma_t \rangle \chi_k \sigma_{f, k}}{\sigma_{t, k}}\\
+  &=  \sigma_a E^l + \langle\sigma_f \rangle E^l,
+\end{align}
+\end{subequations}
+
+
+so the one-group error diffusion equation becomes
+
+\begin{align}
+  -\nabla \cdot \left[\langle D \rangle \nabla E^l     +  \langle D^\prime \rangle  E^l    \right]  + E^l (\sigma_a + \langle \sigma_f \rangle) &=  \eta  r^l + \eta E^l   \langle \sigma_f \rangle\\
+  -\nabla \cdot \left[\langle D \rangle \nabla E^l     +  \langle D^\prime \rangle  E^l    \right]  + E^l \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] &=  \eta  r^l. 
+\end{align}
+
+This provides an equation for the one-group iterative error of a diffusion iteration, which can be used to calculate group errors using \autoref{eq:error-spectral-shape}. Then the set of equations for the accelerated radiative diffusion equation becomes:
+
+\begin{gather}
+  \label{eq:diffusion-half-iter}-\nabla \cdot D_k \nabla I_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k\\
+  \label{eq:onegroup-error-iter}-\nabla \cdot \left[\langle D \rangle \nabla E^{l+1/2}      +  \langle D^\prime \rangle  E^{l+1/2}    \right]  + E^{l+1/2}  \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] =  \eta  r^{l+1/2} \\
+  \label{eq:fix-diffuion}I^{l+1} = I_k^{l+1} + E^{l+1/2}\frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}
+\end{gather}
+
+where
+
+\begin{equation}
+  r^{l+1/2} = \sum_{g=1}^{N_g} \sigma{f, g} \left( I_g^{l+1/2} - I_g^l\right).
+\end{equation}
+
+The full algorithm for the time-dependent problem then becomes:
+
+\begin{algorithm}
+  \caption{Morel, Larsen, Matzen Diffusion Acceleration Scheme \cite{morel1985synthetic}}\label{alg:packed-dna-hamming}
+  \begin{algorithmic}[0]
+    % \Require{$x$ and $y$ are packed dna strings of equal length $n$}
+    \Statex
+    \While{$t^j \leq t^{end}$}
+      \Let{$j$}{$j+1$}
+      \State Compute temperature-dependent coefficients using $T\vert_{t=t^{j-1}}$
+      \While{$\norm{I^{(s)} - I^{(s-1)}} > \epsilon\norm{I^{(s-1)}}$}
+        \Let{$s$}{$s+1$}
+        \State Solve multigroup diffusion equation for $I_k^{(s+1/2)}$, using $I_k^{(s)}$ for the reemission source
+        \State Compute $r^{(s+1/2)}$
+        \State Solve one-group error diffusion equation for $E^{(s+1/2)}$
+        \State Compute $I_k^{(s+1)} = I_k^{(s+1/2)} + E^{(s+1/2)}\langle \sigma_t \rangle \chi_k / \sigma_{t, k}$
+      \EndWhile
+      \Let{$I_k^{j}$}{$I_k^{(s+1)}$}
+      \State Compute $\Delta T^{j+1/2}$ from $I_k^{j}$
+      \If{$K \neq 0 \land u \neq 0$}
+        \State Solve thermal diffusion equation for $\Delta T^{j+1}$
+      \EndIf
+      \Let{$T^{j+1}$}{$T^j + \Delta T^{j+1/2} + \Delta T^{j+1}$}
+      
+    \EndWhile
+  \end{algorithmic}
+\end{algorithm}
 
 \section{Fourier Analysis}\label{sec:fourier_analysis}
 
