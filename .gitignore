@@ -41,3 +41,13 @@
 *.dwo
 
 tpls/
+
+# Tex files
+*.aux
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
+*.nav
+*.toc
