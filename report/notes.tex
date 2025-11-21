@@ -1,17 +1,13 @@
 \documentclass{template}
 \title{Synthetic Acceleration for Radiative Diffusion Calculations\\
-  \large Notes on Morel, Larsen, Matzen 1985 \cite{morel1985synthetic}}
+  \large Notes on Morel, Larsen, Matzen 1985~\cite{morel1985synthetic}}
 
 \author{Kyle Hansen}
 \date{10 October 2025}
 
-\usepackage{cancel}
 
 
-\usepackage{algpseudocode}
-\usepackage{algorithm}
-
-\newcommand*\Let[2]{\State #1 $\gets$ #2}
+\newcommand*\Let[2]{\State{#1 $\gets$ #2}}
 \algrenewcommand\algorithmicrequire{\textbf{Precondition:}}
 \algrenewcommand\algorithmicensure{\textbf{Postcondition:}}
 
@@ -83,7 +79,7 @@ Then, the time advancement of $\beta$ can be approximated using a first-order Ta
 Where $\Delta T^{n+1/2}$ is an intermediate value for the temperature at $t^{n+1}$, not at an intermediate time step, and $T^{n+1/2} = T^n + \Delta T^{n+1/2}$ and $T^{n+1} = T^{n+1/2} + \Delta T^{n+1}$. $\Delta T^{n+1/2}$ can be easily evaluated algebraically from \autoref{eq:MEB}:
 
 \begin{equation}
-  \label{eq:intermediate_temperature}\Delta T^{n+1/2} = \left[    \sum_{g=1}^{N_g} \kappa_g^n \left( I_g^{n+1} -  \beta_k^n  \right) +  \frac{Q^{n+1}}{\rho}    \right] \cdot \left[  \frac{ C_v^n}{\Delta t^n}  + \sum_{g=1}^{N_g}\kappa_g^n \frac{\partial \beta_g^n}{\partial T}\right]^{-1}
+  \label{eq:intermediate_temperature}\Delta T^{n+1/2} = \left[    \sum_{g=1}^{N_g} \kappa_g^n \left( I_g^{n+1} -  \beta_k^n  \right) +  \frac{Q^{n+1}}{\rho}    \right] \cdot {\left[  \frac{ C_v^n}{\Delta t^n}  + \sum_{g=1}^{N_g}\kappa_g^n \frac{\partial \beta_g^n}{\partial T}\right]}^{-1}
 \end{equation}
 
 Evaluating \autoref{eq:intermediate_intensity} using \autoref{eq:intermediate_temperature} yields
@@ -102,8 +98,8 @@ which reduces to the final form of the multigroup diffusion equation,
 where
 \begin{subequations}
   \begin{align}
-    \eta   &=  \left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right] \cdot \left[ \frac{C_v}{\Delta t^n} + \sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T} \right]^{-1} \\
-    \chi_k &=  \left[ \kappa_k  \frac{\partial \beta_k}{\partial T}   \right] \cdot \left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right]^{-1} \\
+    \eta   &=  \left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right] \cdot {\left[ \frac{C_v}{\Delta t^n} + \sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T} \right]}^{-1} \\
+    \chi_k &=  \left[ \kappa_k  \frac{\partial \beta_k}{\partial T}   \right] \cdot {\left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right]}^{-1} \\
     q_k    &=  \rho \kappa_k \beta_k  +  \eta \chi_k \left[ Q - \rho \sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T} \right]
   \end{align}
 \end{subequations}
@@ -125,10 +121,10 @@ where
 \end{align}
 \end{subequations}
 
-with ``fission" and ``absorption" cross sections, and fission emission spectrum $\chi_k$. The fission term will be known as the reimission term.
+with ``fission'' and ``absorption'' cross sections, and fission emission spectrum $\chi_k$. The fission term will be known as the reimission term.
 
-\subsection{Iterative solution}
-\label{sec:iterative_solution}
+\subsection{Iterative solution}\label{sec:iterative_solution}
+
 
 \autoref{eq:neutron_diffusion} can be solved by source iteration, starting from some initial guess $I_{k}^{(0)}$ and using to compute the next iterate $I^{(1)}$, or using each iterate $I_{k}^{l}$ to compute $I_{k}^{l+1}$. Surpressing the $n+1$ index, the iterative equation is
 
@@ -180,7 +176,7 @@ The accelerated iteration scheme is
   x^{l+1}   &=  x^{l+1/2} + \mathcal{W}^{-1}\mathcal{B}{\left( x^{l+1/2}- x^l \right)}
 \end{align}
 
-when solving the radiative diffusion equation, the high-order operator $\mathcal{M}$ is the system of multigroup diffusion equations. The acceleerated scheme presented in \cite{morel1985synthetic} uses a one-group diffusion operator as the low-order operator $\mathcal{W}$.
+when solving the radiative diffusion equation, the high-order operator $\mathcal{M}$ is the system of multigroup diffusion equations. The acceleerated scheme presented in~\cite{morel1985synthetic} uses a one-group diffusion operator as the low-order operator $\mathcal{W}$.
 
 Fourier analyis of the high-order equation shows that the slowest-converging mode is ${\omega(\lambda=0)}$, or
 
@@ -190,7 +186,7 @@ Fourier analyis of the high-order equation shows that the slowest-converging mod
 
 Where $\omega_{\max}$ approaches $1$ as the $\Delta t^n$ is increased. For small time steps, $\omega_{\max} \approx \eta$, which approaches unity for strongly coupled problems, where $C_v$ is small or $\kappa$ is large.
 
-The most effective acceleration schemes should approximate the high-order equations accurately about $\lambda = 0$. This solution corresponds with an equilibrium solution, which will be the focus of the low-order equation. \autoref{sec:fourier_analysis} details the derivation of this result.
+The most effective acceleration schemes should approximate the high-order equations accurately about $\lambda = 0$. This solution corresponds with an equilibrium solution, which will be the focus of the low-order equation.~\autoref{sec:fourier_analysis} details the derivation of this result.
 
 The multigroup equation for the error of the $l$th iterate of \autoref{eq:iterative_neutron} is
 
@@ -225,7 +221,7 @@ where
 
 \begin{align}
   \langle \sigma_f \rangle &= \langle \sigma_t \rangle \sum_{g=1}^{N_g} \frac{\chi_g \sigma_{f, g}}{\sigma{t, g}}\\
-  \langle \sigma_t \rangle &= \left[\sum_{g=1}^{N_g} \frac{\chi_g}{\sigma_{t, g}} \right]^{-1}
+  \langle \sigma_t \rangle &= {\left[\sum_{g=1}^{N_g} \frac{\chi_g}{\sigma_{t, g}} \right]}^{-1}
 \end{align}
 
 then \autoref{eq:second-step-eq-spectrum} can be solved for $\xi^l$,
@@ -249,7 +245,7 @@ yielding the final equilibrium solution of the $l$th iterate error,
   r^l &= \sum_{g=1}^{N_G}\sigma_{f, g}\left(I_g^l - I_g^{l-1} \right)\\
   \xi^l &= \frac{\eta \langle \sigma_f \rangle r^l}{\langle \sigma_t \rangle - \eta \langle \sigma_f \rangle}\\
   \langle \sigma_f \rangle &= \langle \sigma_t \rangle \sum_{g=1}^{N_g} \frac{\chi_g \sigma_{f, g}}{\sigma{t, g}}\\
-  \langle \sigma_t \rangle &= \left[\sum_{g=1}^{N_g} \frac{\chi_g}{\sigma_{t, g}} \right]^{-1}
+  \langle \sigma_t \rangle &= {\left[\sum_{g=1}^{N_g} \frac{\chi_g}{\sigma_{t, g}} \right]}^{-1}
   \end{align}
 \end{subequations}
 
@@ -340,40 +336,93 @@ where
   r^{l+1/2} = \sum_{g=1}^{N_g} \sigma{f, g} \left( I_g^{l+1/2} - I_g^l\right).
 \end{equation}
 
-The full algorithm for the time-dependent problem then becomes:
+The full algorithm for the time-dependent problem is shown in Algorithm~\ref{alg:packed-dna-hamming}.
 
 \begin{algorithm}
-  \caption{Morel, Larsen, Matzen Diffusion Acceleration Scheme \cite{morel1985synthetic}}\label{alg:packed-dna-hamming}
+  \caption{Morel, Larsen, Matzen Diffusion Acceleration Scheme~\cite{morel1985synthetic}}\label{alg:packed-dna-hamming}
   \begin{algorithmic}[0]
     % \Require{$x$ and $y$ are packed dna strings of equal length $n$}
-    \Statex
+    \Statex{}
     \While{$t^j \leq t^{end}$}
       \Let{$j$}{$j+1$}
-      \State Compute temperature-dependent coefficients using $T\vert_{t=t^{j-1}}$
+      \State{Compute temperature-dependent coefficients using $T\vert_{t=t^{j-1}}$}
       \While{$\norm{I^{(s)} - I^{(s-1)}} > \epsilon\norm{I^{(s-1)}}$}
         \Let{$s$}{$s+1$}
-        \State Solve multigroup diffusion equation for $I_k^{(s+1/2)}$, using $I_k^{(s)}$ for the reemission source
-        \State Compute $r^{(s+1/2)}$
-        \State Solve one-group error diffusion equation for $E^{(s+1/2)}$
-        \State Compute $I_k^{(s+1)} = I_k^{(s+1/2)} + E^{(s+1/2)}\langle \sigma_t \rangle \chi_k / \sigma_{t, k}$
-      \EndWhile
+        \State{Solve multigroup diffusion equation for $I_k^{(s+1/2)}$, using $I_k^{(s)}$ for the reemission source}
+        \State{Compute $r^{(s+1/2)}$}
+        \State{Solve one-group error diffusion equation for $E^{(s+1/2)}$}
+        \State{Compute $I_k^{(s+1)} = I_k^{(s+1/2)} + E^{(s+1/2)}\langle \sigma_t \rangle \chi_k / \sigma_{t, k}$}
+      \EndWhile{}
       \Let{$I_k^{j}$}{$I_k^{(s+1)}$}
-      \State Compute $\Delta T^{j+1/2}$ from $I_k^{j}$
+      \State{Compute $\Delta T^{j+1/2}$ from $I_k^{j}$}
       \If{$K \neq 0 \land u \neq 0$}
-        \State Solve thermal diffusion equation for $\Delta T^{j+1}$
-      \EndIf
+        \State{Solve thermal diffusion equation for $\Delta T^{j+1}$}
+      \EndIf{}
       \Let{$T^{j+1}$}{$T^j + \Delta T^{j+1/2} + \Delta T^{j+1}$}
-      
-    \EndWhile
+    \EndWhile{}
   \end{algorithmic}
 \end{algorithm}
 
 \section{Fourier Analysis}\label{sec:fourier_analysis}
 
+The iterative diffusion equation, \autoref{eq:iterative_neutron}, is
 
 
+\begin{equation}
+  -\nabla \cdot D_k \nabla I_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k.
+\end{equation}
 
-\cite{fleck1971implicit}
+Subtracting this from the exact equation, \autoref{eq:neutron_diffusion}, yields the iterative equation for error:
+
+\begin{align}
+  -\nabla \cdot D_k \nabla \left(I_k^\star - I_k^{l+1}\right) + \left( \sigma_a + \sigma_{f, k} \right)\left(I_k^\star - I_k^{l+1}\right) &= \eta \chi_k \left(\sum_{g=1}^{N_g}\sigma_{f, g}I_g^\star - \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l\right)\\
+  -\nabla \cdot D_k \nabla \epsilon_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)\epsilon_k^{l+1} &= \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}\epsilon_g^{l}.\label{eq:iterative-error-convergence} 
+\end{align}
+
+For infinite 1D spatial domain and constant coefficients, the Fourier Ansatz assumes a form of the error (and solution),
+
+\begin{equation}
+  \epsilon_k^{l}(x) = \epsilon_k^l e^{i\lambda x}.
+\end{equation}
+
+Using this assumed form, \autoref{eq:iterative-error-convergence} is
+
+\begin{align}
+  -D_k \epsilon_k^{l+1}\nabla^2 e^{i\lambda x} + \left( \sigma_a + \sigma_{f, k} \right)\epsilon_k^{l+1} e^{i\lambda x} &= \eta \chi_k  e^{i\lambda x}\sum_{g=1}^{N_g}\sigma_{f, g}\epsilon_g^{l}\\
+  e^{i\lambda x} \left[\lambda^2 D_k \epsilon_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)\epsilon_k^{l+1} \right] &= e^{i\lambda x} \left[\eta \chi_k  \sum_{g=1}^{N_g}\sigma_{f, g}\epsilon_g^{l}\right]\\
+  \epsilon_k^{l+1} \left[\lambda^2 D_k+ \sigma_a + \sigma_{f, k} \right] &= \eta \chi_k  \sum_{g=1}^{N_g}\sigma_{f, g}\epsilon_g^{l}\\
+  \epsilon_k^{l+1}  &=  \frac{\eta \chi_k  \sum_{g=1}^{N_g}\sigma_{f, g}\epsilon_g^{l}}{\lambda^2 D_k+ \sigma_a + \sigma_{f, k}}.
+\end{align}
+
+Then, using $F^l = \sum_{k=1}^{N_g}\sigma_{f, k}\epsilon_k^l$, this equation becomes
+
+\begin{align}
+  \sum_{k=1}^{N_g}\sigma_{f, k}\epsilon_k^{l+1}  &= \sum_{k=1}^{N_g} \frac{\sigma_{f, k}\eta \chi_k  \sum_{g=1}^{N_g}\sigma_{f, g}\epsilon_g^{l}}{\lambda^2 D_k+ \sigma_a + \sigma_{f, k}}\\
+  F^{l+1}  &= \sum_{k=1}^{N_g} \frac{\sigma_{f, k}\eta \chi_k  F^l}{\lambda^2 D_k+ \sigma_a + \sigma_{f, k}}\\
+  F^{l+1}  &=  F^l\eta \sum_{k=1}^{N_g} \frac{\sigma_{f, k} \chi_k }{\lambda^2 D_k+ \sigma_a + \sigma_{f, k}},
+\end{align}
+
+which corresponds to a Source Iteration eigenvalue of 
+
+\begin{equation}\label{eq:fourier-eigenvalue}
+  \omega(\lambda) = \eta \sum_{k=1}^{N_g} \frac{\sigma_{f, k} \chi_k }{\lambda^2 D_k+ \sigma_a + \sigma_{f, k}},
+\end{equation}
+
+where 
+
+\begin{equation}
+  \sum_{k=1}^{N_g}\sigma_{f, k}\epsilon_k^{l+1} = \omega(\lambda) \sum_{k=1}^{N_g}\sigma_{f, k}\epsilon_k^l.
+\end{equation}
+
+The spectral radius corresponds with the eigenmode $\lambda=0$, and is equal to 
+
+\begin{equation}
+  \text{spr} = \eta \sum_{k=1}^{N_g} \frac{\sigma_{f, k} \chi_k }{\sigma_a + \sigma_{f, k}}
+\end{equation}
+
+As the time step $\Delta t$ becomes large, $\sigma_a \rightarrow 0$ and $\eta \rightarrow 1$, and from \autoref{eq:fourier-eigenvalue}, the spectral radius approaches one. $\eta$ also approaches one for large opacity or small heat capacity, or in strong radiation-material coupling.
+
+t~\cite{fleck1971implicit}
 
 \bibliographystyle{ieeetr}
 \bibliography{references.bib}

@@ -13,6 +13,9 @@
 \usepackage{enumitem}
 \usepackage[pdfborderstyle={/S/U/W 1}]{hyperref}
 \usepackage{parskip}
+\usepackage{cancel}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
 % \usepackage{amsthm}
 \usepackage{subcaption}
 
@@ -27,13 +30,14 @@
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}[theorem]{Lemma}
 % \renewcommand\qedsymbol{QED}
-\renewcommand\theoremautorefname{Lemma }
+\renewcommand\theoremautorefname{Lemma}
+\renewcommand{\sectionautorefname}{Sec.}
 
 \setlength{\parindent}{0em}
 \setlength{\parskip}{1ex}
 % ~~~ declaration of options ~~~~~~~~~
-\renewcommand\thesubsection{\thesection (\alph{subsection})}
-\titleformat{\section}{\normalfont\Large\bfseries}{Section \thesection}{1ex}{}
+\renewcommand\thesubsection{\thesection.\arabic{subsection}}
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection. }{1ex}{}
 \titleformat{\subsection}[runin]{\normalfont\large\bfseries}{\newline\newline\hspace{2em}\thesubsection}{1ex}{}[\setlength{\parindent}{2em}]
 
 
