@@ -422,6 +422,212 @@ The spectral radius corresponds with the eigenmode $\lambda=0$, and is equal to
 
 As the time step $\Delta t$ becomes large, $\sigma_a \rightarrow 0$ and $\eta \rightarrow 1$, and from \autoref{eq:fourier-eigenvalue}, the spectral radius approaches one. $\eta$ also approaches one for large opacity or small heat capacity, or in strong radiation-material coupling.
 
+\section{Numerical Implementation}
+
+\autoref{eq:diffusion-half-iter}, \ref{eq:onegroup-error-iter}, and \ref{eq:fix-diffuion} are the iterative algorithm for radiative diffusion with implicit temporal differencing and lagged coefficients. If it is further assumed that the temperature is spatially invariant within each cell, then the constant $\langle D^\prime \rangle$ becomes zero and the equations are
+
+\begin{gather}
+  \label{eq:og-equation}-\nabla \cdot D_k \nabla I_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k\\
+  -\nabla \cdot \langle D \rangle \nabla E^{l+1/2}       + E^{l+1/2}  \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] =  \eta  r^{l+1/2} \\
+  I^{l+1} = I_k^{l+1} + E^{l+1/2}\frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}.
+\end{gather}
+
+To solve using the Linear Discontinuous (LD) discretization, we first divide the domain $(0, X)$ into $N_x$ cells $K_i = \left[ x_{i-1/2},\;x_{i+1/2} \right], \qquad i=1,\hdots N$ with cell width $\Delta x_i = x_{i+1/2} - x_{i-1/2}$. Then let $I_{i}(x)$ represent the intensity in cell $i$, and $F_i$ represent the flux in cell $i$, where, from the diffuion approximation,
+
+\begin{equation}
+  F_i = -D_i \cdot \nabla I_i.
+\end{equation}
+
+Then, in one dimension only, the diffusion equation \ref{eq:og-equation} can be expressed (surpressing $k$ subscripts) as the system
+
+\begin{subequations}\label{eq:p1-equations}
+ \begin{align}
+  \label{eq:zeroth-moment}\frac{d}{dx} F^{l+1}_i + \left( \sigma_a + \sigma_{f} \right)I^{l+1}_i &= \eta \chi \sum_{g=1}^{N_g}\sigma_{f, g}I_{i, g}^l + S_i\\
+  \label{eq:first-moment}F_i &= -D_i \cdot \frac{d}{dx} I_i.
+\end{align} 
+\end{subequations}
+
+
+In the LD discretization, the intensity in cell $K_i$ is
+
+\begin{gather}
+  I_i(x) = I_{L, i} b_{L, i}(x) +  I_{R, i} b_{R, i}(x),\\
+  b_{L, i}(x) = \frac{x_{i+1/2}-x}{\Delta x_i}, \qquad b_{R, i}(x) = \frac{x - x_{i-1/2}}{\Delta x_i}
+\end{gather}
+
+then $I_{L, i}$ and $I_{R, i}$ are the unknown intensity values at the left and right edges of cell $i$. The cell-average intensity is given by
+
+\begin{equation}
+    \overline{I_i} = \frac{1}{2}\left(I_{L, i} +  I_{R, i}\right).
+\end{equation}
+
+The same discretization is applied to flux $F$. Multiplying \autoref{eq:zeroth-moment} by the test functions $b_c, c=L, R$ and integrating over the cell $K_i$ yields
+
+\begin{multline}
+  \int_{x_{i-1/2}}^{x_{i+1/2}}b_c(x) \frac{d}{dx} F^{l+1}_i(x) dx + \left( \sigma_a + \sigma_{f} \right) \int_{x_{i-1/2}}^{x_{i+1/2}}b_c(x) I^{l+1}_i dx=\\
+   \eta \chi \sum_{g=1}^{N_g}\sigma_{f, g} \int_{x_{i-1/2}}^{x_{i+1/2}}b_c(x) I_{i, g}^l dx+ \int_{x_{i-1/2}}^{x_{i+1/2}}b_c(x)S_i(x) dx.
+\end{multline}
+
+Integrating the first term by parts yields
+
+\begin{align}
+  \left[ b_c (x) F_i (x) \right]_{x_{i-1/2}}^{x_{i+1/2}} &- \int_{x_{i-1/2}}^{x_{i+1/2}} \frac{db_c}{dx}F_i (x) dx\\
+  \left[ b_c (x) F_i (x) \right]_{x_{i-1/2}}^{x_{i+1/2}} & \pm \frac{1}{\Delta x}\int_{x_{i-1/2}}^{x_{i+1/2}} F_i (x) dx\\
+  \left[ b_c (x) F_i (x) \right]_{x_{i-1/2}}^{x_{i+1/2}} & \pm  \frac{1}{2}(F_L + F_R)
+\end{align}
+
+where one of the boundary terms vanishes for each value of $c$, and the sign of the second term depends again on $c$, since $db_L/dx = -1/\Delta x$ and $db_R/dx = 1/\Delta x$. Then, the $\int b I$ terms are expanded in terms of the mass matrix,
+
+\begin{gather}
+  \mat{M}_i = \frac{1}{6}\begin{bmatrix}
+    m_{LL} & m_{LR}\\
+    m_{RL} & m_{RR}
+  \end{bmatrix}\\
+  \mat{M}_{i, LD} = \frac{1}{6}\begin{bmatrix}
+    2 & 1\\
+    1 & 2
+  \end{bmatrix}\\
+  \mat{M}_{i, LLD} = \frac{1}{6}\begin{bmatrix}
+    3 & 0\\
+    0 & 3
+  \end{bmatrix}.
+\end{gather}
+
+
+\autoref{eq:first-moment} is written in the same way as the first ($d/dx$) term of \autoref{eq:zeroth-moment}. Then, for $c=L$,
+
+\begin{subequations}\label{eq:left}
+  \begin{multline}
+    -F^{b, l+1}(x_{i-1/2}) + \frac{1}{2} \left(F_{L, i}^{l+1} + F_{R, i}^{l+1}\right) + \left( \sigma_{a, i} + \sigma_{f, k, i} \right) \left( m_{LL}  I_{L, i}^{l+1} +m_{LR} I_{R, i}^{l+1}   \right)\frac{\Delta x_i}{6} =\\
+    \eta_i \chi_{k, i} \sum_{g=1}^{N_g}\sigma_{f, g, i} \left( m_{LL}  I_{L, i, g}^{l} +m_{LR} I_{R, i, g}^{l}   \right)\frac{\Delta x_i}{6} + \left( m_{LL}  S_{L, i, k}^{l+1} +m_{LR} S_{R, i, k}^{l+1}   \right)\frac{\Delta x_i}{6}
+  \end{multline}
+  \begin{equation}
+    \left( m_{LL}  F_{L, i, k}^{l+1} +m_{LR} F_{R, i, k}^{l+1}   \right)\frac{\Delta x_i}{6} = -D_{k, i} \left[ -I_k^{b, l+1}(x_{i-1/2}) +   \frac{1}{2} \left(I_{L, i, k}^{l+1} + I_{R, i, k}^{l+1}\right)\right],
+  \end{equation}
+\end{subequations}
+
+and for $c=R$, 
+
+\begin{subequations}\label{eq:right}
+  \begin{multline}
+    F^{b, l+1}(x_{i+1/2}) - \frac{1}{2} \left(F_{L, i}^{l+1} + F_{R, i}^{l+1}\right) + \left( \sigma_{a, i} + \sigma_{f, k, i} \right) \left( m_{RL}  I_{L, i}^{l+1} +m_{RR} I_{R, i}^{l+1}   \right) \frac{\Delta x_i}{6}=\\
+    \eta_i \chi_{k, i} \sum_{g=1}^{N_g}\sigma_{f, g, i} \left( m_{RL}  I_{L, i, g}^{l} +m_{RR} I_{R, i, g}^{l}   \right) \frac{\Delta x_i}{6}+ \left( m_{RL}  S_{L, i, k}^{l+1} +m_{RR} S_{R, i, k}^{l+1}   \right)\frac{\Delta x_i}{6}
+  \end{multline}
+  \begin{equation}
+    \left( m_{LL}  F_{L, i, k}^{l+1} +m_{LR} F_{R, i, k}^{l+1}   \right)\frac{\Delta x_i}{6} = -D_{k, i} \left[ I_k^{b, l+1}(x_{i+1/2}) -   \frac{1}{2} \left(I_{L, i, k}^{l+1} + I_{R, i, k}^{l+1}\right)\right].
+  \end{equation}
+\end{subequations}
+
+
+Since the values of $I$ and $F$ are discontinuous on cell boundaries, the following interface conditions are used:
+
+\begin{gather}
+  F^b(x_{i+1/2}) = \frac{1}{2}\left(F_{R, i} + F_{L, i+1} \right) + \frac{1}{4}\left( I_{R, i} - I_{L, i+1} \right)\\
+  I^b(x_{i+1/2}) = \frac{3}{4}\left( F_{R, i} - F_{L, i+1} \right) + \frac{1}{2}\left(I_{R, i} + I_{L, i+1} \right).
+\end{gather}
+
+The Marshak boundary conditions, which fix the interface conditions $F^b$ and $I^b$ at $x = 0, X$, become
+
+
+  \begin{subequations}\label{eq:left-boundary}
+    \begin{gather}
+      I^b(0) = I^{in,+} + \frac{1}{2}\left( I_{L, 1} - \frac{3}{2}F_{L, 1} \right)\\
+    F^b(0) = F^{in,+} - \frac{1}{4}I_{L, 1} + \frac{1}{2}F_{L, 1}
+  \end{gather}
+  \end{subequations}
+  \begin{subequations}\label{eq:right-boundary}
+    \begin{gather}
+      I^b(X) = I^{in,-} + \frac{1}{2}\left( I_{R, N_x} + \frac{3}{2}F_{R, N_x} \right)\\
+      F^b(X) = F^{in,-} - \frac{1}{4}I_{R, N_x} + \frac{1}{2}F_{R, N_x},
+    \end{gather}
+  \end{subequations}
+
+
+  
+
+
+where
+
+\begin{gather}
+  F^{in, -} = \int_{-1}^{0} \mu I^{in, -}(X, \mu)d \mu, \qquad F^{in, +} = \int_{0}^{+1} \mu I^{in, +}(0, \mu)d \mu\\
+  I^{in, -} = \int_{-1}^{0}  I^{in, -}(X, \mu)d \mu, \qquad I^{in, +} = \int_{0}^{+1}  I^{in, +}(0, \mu)d \mu
+\end{gather}
+
+Then, for the interior cells, from $\int_{K_i} \cdot \; b_L dx$ we obtain  
+
+\begin{subequations}\label{eq:left-equations}
+  \begin{multline}
+    \left[-\frac{1}{4} \left( I_{R, i-1}^{n+1} - I_{L, i}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{LL}I_{L, i}^{n+1} + m_{LR}I_{R, i}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
+    + \left[ -\frac{1}{2}\left( F_{R, i-1}^{n+1} + F_{L,i}^{n+1}\right) + \frac{1}{2}\left( F_{L, i}^{n+1} + F_{R, i}^{n+1}\right)\right] =\\
+    \left[\eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}\left(m_{LL}I_{L, i, g}^n + m_{LR}I_{R, i, g}^n\right)\frac{\Delta x_i}{6} + \frac{1}{c\Delta t^n}\left(m_{LL}I_{L, i}^n + m_{LR}I_{R, i}^n\right)\frac{\Delta x_i}{6} \right]\\
+    + \left[\left(m_{LL}q_{L, i} + m_{LR}q_{R, i}\right)\frac{\Delta x_i}{6}\right]
+  \end{multline}
+  \begin{multline}
+    \left[\left(m_{LL}F_{L, i}^{n+1} + m_{LR}F_{R, i}^{n+1}\right)\frac{\Delta x_i}{6} -\frac{3}{4}  D_k \left( F_{R, i-1}^{n+1} - F_{L, i}^{n+1} \right)\right]\\
+    +\left[- \frac{1}{2}D_k \left( I_{R, i-1}^{n+1} - I_{L, i}^{n+1}\right)  + \frac{1}{2}D_k \left(I_{L, i}^{n+1} + I_{R, i} ^{n+1}\right)\right]=0,
+  \end{multline}
+\end{subequations}
+
+and from $\int_{K_i} \cdot \; b_R dx$, 
+
+
+\begin{subequations}\label{eq:right-equations}
+  \begin{multline}
+    \left[\frac{1}{4} \left( I_{R, i}^{n+1} - I_{L, i+1}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{RL}I_{L, i}^{n+1} + m_{RR}I_{R, i}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
+    + \left[ \frac{1}{2}\left( F_{R, i}^{n+1} + F_{L,i+1}^{n+1}\right) - \frac{1}{2}\left( F_{L, i}^{n+1} + F_{R, i}^{n+1}\right)\right] =\\
+    \left[\eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}\left(m_{RL}I_{L, i, g}^n + m_{RR}I_{R, i, g}^n\right)\frac{\Delta x_i}{6} + \frac{1}{c\Delta t^n}\left(m_{RL}I_{L, i}^n + m_{RR}I_{R, i}^n\right)\frac{\Delta x_i}{6} \right]\\
+    + \left[\left(m_{RL}q_{L, i} + m_{RR}q_{R, i}\right)\frac{\Delta x_i}{6}\right]
+  \end{multline}
+  \begin{multline}
+    \left[\left(m_{RL}F_{L, i}^{n+1} + m_{RR}F_{R, i}^{n+1}\right)\frac{\Delta x_i}{6} +\frac{3}{4}  D_k \left( F_{R, i}^{n+1} - F_{L, i+1}^{n+1} \right)\right]\\
+    +\left[\frac{1}{2}D_k \left( I_{R, i-1}^{n+1} - I_{L, i}^{n+1}\right)  - \frac{1}{2}D_k \left(I_{L, i}^{n+1} + I_{R, i} ^{n+1}\right)\right]=0.
+  \end{multline}
+\end{subequations}
+
+In the left boundary cell, using \autoref{eq:left-boundary}, we have
+
+\begin{subequations}
+  \begin{multline}
+    \left[\frac{1}{4} \left( I_{L, 1}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{LL}I_{L, 1}^{n+1} + m_{LR}I_{R, 1}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
+    + \left[ -\frac{1}{2}\left( F_{L,1}^{n+1}\right) + \frac{1}{2}\left( F_{L, 1}^{n+1} + F_{R, 1}^{n+1}\right)\right] =\\
+    \left[\eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}\left(m_{LL}I_{L, 1, g}^n + m_{LR}I_{R, 1, g}^n\right)\frac{\Delta x_i}{6} + \frac{1}{c\Delta t^n}\left(m_{LL}I_{L, 1}^n + m_{LR}I_{R, 1}^n\right)\frac{\Delta x_i}{6} \right]\\
+    + \left[\left(m_{LL}q_{L, 1} + m_{LR}q_{R, 1}\right)\frac{\Delta x_i}{6}\right] + F^{in, +, n}
+  \end{multline}
+  \begin{multline}
+    \left[\left(m_{LL}F_{L, 1}^{n+1} + m_{LR}F_{R, 1}^{n+1}\right)\frac{\Delta x_i}{6} -\frac{3}{4}  D_k \left( - F_{L, 1}^{n+1} \right)\right]\\
+    +\left[ \frac{1}{2}D_k \left(  I_{L, 1}^{n+1}\right)  + \frac{1}{2}D_k \left(I_{L, 1}^{n+1} + I_{R, 1} ^{n+1}\right)\right]=E^{in, +, n},
+  \end{multline}
+\end{subequations}
+
+
+and in the right boundary cell, using \autoref{eq:right-boundary}, we have
+
+
+
+\begin{subequations}\label{eq:right-equations}
+  \begin{multline}
+    \left[\frac{1}{4} \left( I_{R, {N_x}}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{RL}I_{L, {N_x}}^{n+1} + m_{RR}I_{R, {N_x}}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
+    + \left[ \frac{1}{2}\left( F_{R, {N_x}}^{n+1} \right) - \frac{1}{2}\left( F_{L, {N_x}}^{n+1} + F_{R, {N_x}}^{n+1}\right)\right] =\\
+    \left[\eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}\left(m_{RL}I_{L, {N_x}, g}^n + m_{RR}I_{R, {N_x}, g}^n\right)\frac{\Delta x_i}{6} + \frac{1}{c\Delta t^n}\left(m_{RL}I_{L, {N_x}}^n + m_{RR}I_{R, {N_x}}^n\right)\frac{\Delta x_i}{6} \right]\\
+    + \left[\left(m_{RL}q_{L, {N_x}} + m_{RR}q_{R, {N_x}}\right)\frac{\Delta x_i}{6}\right] - F^{in, -, n}
+  \end{multline}
+  \begin{multline}
+    \left[\left(m_{RL}F_{L, {N_x}}^{n+1} + m_{RR}F_{R, {N_x}}^{n+1}\right)\frac{\Delta x_i}{6} +\frac{3}{4}  D_k \left( F_{R, {N_x}}^{n+1} \right)\right]\\
+    +\left[\frac{1}{2}D_k \left( I_{R, {N_x}-1}^{n+1} \right)  - \frac{1}{2}D_k \left(I_{L, {N_x}}^{n+1} + I_{R, {N_x}} ^{n+1}\right)\right]= -E^{in, -, n}.
+  \end{multline}
+\end{subequations}
+
+
+
+
+
+
+
+
+
+\section{Next section}
+
+
 t~\cite{fleck1971implicit}
 
 \bibliographystyle{ieeetr}
