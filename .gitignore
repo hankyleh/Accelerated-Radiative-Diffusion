@@ -10,6 +10,7 @@ tpls/
 *.nav
 *.toc
 *.bbl
+*.xdv
 
 __pycache__/
 venv/
