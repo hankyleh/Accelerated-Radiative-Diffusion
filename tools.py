@@ -34,6 +34,35 @@ def dbl(array):
         return numpy.repeat(array, 2)
     # doubles a constant, to reshape for L and R
 
+class Transport_solution:
+    def __init__(self, mesh):
+        self.vec = numpy.zeros((mesh.ng, 4*mesh.nx))
+        self._nx =  numpy.copy(mesh.nx)
+        self._ng = numpy.copy(mesh.ng)
+
+    
+    @property
+    def intensity(self):
+        return self.vec[:, :2*self._nx]
+    
+    @intensity.setter
+    def intensity(self, value):
+        self.vec[:, :2*self._nx] = value
+
+    @property
+    def flux(self):
+        return self.vec[:, 2:self._nx:]
+    
+    @flux.setter
+    def flux(self, value):
+        self.vec[:, 2:self._nx:] = value
+
+    @property
+    def cell_center_i(self):
+        return 0.5 * (self.intensity[:, 1::2] + self.intensity[:, 0::2])
+    
+        
+
 class Scales:
     t = 1
     I = 1
@@ -123,7 +152,9 @@ class MG_coefficients:
         self.D = numpy.zeros((mesh.ng, mesh.nx))
 
 
-    def assign(self, mesh, kappa, I_prev, T_prev, Cv, Q):
+    def assign(self, mesh, kappa, sol_prev : Transport_solution, T_prev, Cv, Q):
+        self.kappa = kappa
+        I_prev = sol_prev.intensity
         self.db_dt = physics.group_dB_dT(mesh, T_prev)
         self.beta = physics.group_planck(mesh, T_prev)
 

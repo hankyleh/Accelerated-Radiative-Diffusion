@@ -3,6 +3,7 @@ import tools
 import physics # type: ignore
 import numpy
 import scipy.sparse as sparse
+import copy
 
 
 def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
@@ -81,7 +82,7 @@ def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
 
 def get_HO_source(
         mesh  : tools.Discretization, 
-        prev_soln, 
+        prev_I, 
         coeff : tools.MG_coefficients, 
         k     : int):
     source = numpy.zeros((4*mesh.nx))
@@ -89,7 +90,7 @@ def get_HO_source(
     # compute fission source, add to 'S'
     source[0:2*mesh.nx] = (coeff.S[k] 
                 + (tools.dbl(coeff.eta[k]) * tools.dbl(coeff.chi[k])
-                * numpy.sum(tools.dbl(coeff.sig_f) * prev_soln[:, 0:2*mesh.nx], axis=0)))
+                * numpy.sum(tools.dbl(coeff.sig_f) * prev_I, axis=0)))
     # print(numpy.sum(tools.dbl(coeff.sig_f) * prev_soln[:, 0:2*mesh.nx], axis=0))
     # add BCs
     source[0] += mesh.F_BC[k, 0]
@@ -131,14 +132,20 @@ def low_order_assembly():
     # pcg or other iterative solve
     return 0
 
-def unaccelerated_loop(mesh : tools.Discretization, sol_prev, T_prev, kappa, Cv, Q):
+def unaccelerated_loop(mesh : tools.Discretization, 
+                       sol_prev : tools.Transport_solution, 
+                       T_prev, 
+                       kappa, 
+                       Cv, 
+                       Q):
     coeff = tools.MG_coefficients(mesh)
-    I_prev = sol_prev[:, :2*mesh.nx]
-    coeff.assign(mesh, kappa, I_prev, T_prev, Cv, Q)
+    I_prev = sol_prev.intensity[:]
+    coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
 
 
-    last_iteration = sol_prev.copy()
-    updated_solution = sol_prev.copy()
+
+    last_iteration = sol_prev.vec[:].copy()
+    updated_solution = numpy.zeros((mesh.ng, 4*mesh.nx))
 
     # print(last_iteration)
     
@@ -182,17 +189,52 @@ def accelerated_loop():
         # calculate norm(change)
     return 0
 
+def update_temperature(mesh : tools.Discretization, 
+                       coeff : tools.MG_coefficients, 
+                       soln : tools.Transport_solution,
+                       prev_temp,
+                       Cv,
+                       Q = 0):
+    # TODO
+
+ 
+    # print(numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0))
+    # print("sum")
+
+    # print((Cv/mesh.dt))
+    # print("Cv/dt")
+
+    # print(numpy.sum(coeff.kappa * coeff.db_dt, axis = 0))
+    # print("sum dbdt")
+
+    # print(coeff.kappa)
+    # print("kappa")
+
+
+    # print(coeff.db_dt)
+    # print("dbdt")
+
+    dt = (
+        numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0) + Q
+    )/(
+        (Cv/mesh.dt) + numpy.sum(coeff.kappa * coeff.db_dt, axis = 0)
+    )
+
+    return dt
+
+    # calculate planck function, dbdt, all necessary constants
+
 def solve(mesh : tools.Discretization, scale : tools.Scales, opacity, acc=0):
     # TODO
     dt = mesh.dt
     nu = mesh.groups
 
-    # gets intensity, flux, and temperature at each provided time stop
-    transport_output = numpy.zeros((numpy.sum(mesh.nt), mesh.ng, 4*mesh.nx))
-    temp_output = numpy.zeros((numpy.sum(mesh.nt), mesh.nx))
+    # gets intensity, flux, and temperature at each provided time stop 
+    transport_output = []
+    temp_output = tools.Transport_solution()
 
     if acc == 0:
-
+        # 
         
         # unaccelerated iteration scheme
 

@@ -76,8 +76,9 @@ mesh.F_BC = numpy.zeros((mesh.ng, 2))
 mesh.I_BC[:, 0] = physics.group_planck(mesh, 1000/physics.K)[:, 0]
 mesh.F_BC[:, 0] = physics.group_planck(mesh, 1000/physics.K)[:, 0]
 
-print(mesh.I_BC)
-print(mesh.F_BC)
+# print(mesh.I_BC)
+# print(mesh.F_BC)
+mesh.dt = 2e-13
 # mesh.I_BC[-4, 0] = 100
 # mesh.F_BC[-4, 0] = 100
 
@@ -109,55 +110,73 @@ T_prev = (1/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
 kappa = group_FC_opacity(mesh, T_prev,  k_star)
 # print(kappa)
 # kappa = numpy.ones((mesh.ng, mesh.nx))
-Cv    = numpy.ones((mesh.ng, mesh.nx))
+Cv    = numpy.tile(FC_heatcap(1, mesh), reps=(mesh.ng, 1))
+# print(Cv)
+# print("heat capacity")
 Q     = numpy.zeros((mesh.ng, mesh.nx))
 
 
 
-I_prev = numpy.zeros((mesh.ng, 4*mesh.nx))
-
-print(physics.group_planck(mesh, T_prev))
+# print(physics.group_planck(mesh, T_prev))
 
 
-I_prev[:, :2*mesh.nx] = 2*tools.dbl(physics.group_planck(mesh, T_prev))
+sol_prev = tools.Transport_solution(mesh)
+b = tools.Transport_solution(mesh)
+sol_prev.intensity = 2*tools.dbl(physics.group_planck(mesh, T_prev))
 
 coeff = tools.MG_coefficients(mesh)
-coeff.assign(mesh, kappa, I_prev[:, :2*mesh.nx], T_prev, Cv, Q)
+coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
 
 # print(coeff.S)
 # print(coeff.eta)
 # print(coeff.chi)
 
-a = method.get_HO_source(mesh, I_prev, coeff, mesh.ng-4)
+a = method.get_HO_source(mesh, sol_prev.intensity, coeff, mesh.ng-4)
 # print(coeff.D)
 # print(a)
 
-b  = method.unaccelerated_loop(mesh, I_prev, T_prev, kappa, Cv, Q)
+b.vec  = method.unaccelerated_loop(mesh, sol_prev, T_prev, kappa, Cv, Q)
+
+
+# print(coeff.beta)
+# print("beta")
+# print(coeff.db_dt)
+# print("dbdt")
+# print(b.cell_center_i)
+# print("cell center I")
+
+test = method.update_temperature(mesh, coeff, b, T_prev, Cv)
+print(test)
 
 # print(b)
-b = numpy.array(b)
 
-print(I_prev)
-
-plt.figure()
-ax = plt.gca()
-lines = tools.LD_plottable(mesh, I_prev)
-tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
-plt.title("Initial state, intensity")
-ax.autoscale()
-plt.show()
+# print(b.intensity)
+# print(b.cell_center_i)
 
 
+# print("intensity")
 
-plt.figure()
-ax = plt.gca()
-lines = tools.LD_plottable(mesh, b)
+# plt.figure()
+# ax = plt.gca()
+# lines = tools.LD_plottable(mesh, sol_prev.vec)
 # tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
-tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
-plt.title("time-advanced state, intensity")
-ax.autoscale()
+# plt.title("Initial state, intensity")
+# ax.autoscale()
+# # plt.show()
 
-plt.show()
+# center = b.cell_center_i
+# print(mesh.cell_centers.shape)
+# print(center.shape)
+
+# plt.figure()
+# ax = plt.gca()
+# lines = tools.LD_plottable(mesh, b.vec)
+# # tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
+# tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
+# plt.title("time-advanced state, intensity")
+# ax.autoscale()
+
+# plt.show()
 
 
 
