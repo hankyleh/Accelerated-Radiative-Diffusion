@@ -522,7 +522,7 @@ and for $c=R$,
 Since the values of $I$ and $F$ are discontinuous on cell boundaries, the following interface conditions are used:
 
 \begin{gather}
-  F^b(x_{i+1/2}) = \frac{1}{2}\left(F_{R, i} + F_{L, i+1} \right) + \frac{1}{4}\left( I_{R, i} - I_{L, i+1} \right)\\
+  F^b(x_{i+1/2}) = \frac{1}{2}\left(F_{R, i} - F_{L, i+1} \right) + \frac{1}{4}\left( I_{R, i} + I_{L, i+1} \right)\\
   I^b(x_{i+1/2}) = \frac{3}{4}\left( F_{R, i} - F_{L, i+1} \right) + \frac{1}{2}\left(I_{R, i} + I_{L, i+1} \right).
 \end{gather}
 
@@ -532,70 +532,66 @@ The Marshak boundary conditions, which fix the interface conditions $F^b$ and $I
   \begin{subequations}\label{eq:left-boundary}
     \begin{gather}
       I^b(0) = I^{in,+} + \frac{1}{2}\left( I_{L, 1} - \frac{3}{2}F_{L, 1} \right)\\
-    F^b(0) = F^{in,+} - \frac{1}{4}I_{L, 1} + \frac{1}{2}F_{L, 1}
+      F^b(0) = F^{in,+} + \frac{1}{4}I_{L, 1} - \frac{1}{2}F_{L, 1}
   \end{gather}
   \end{subequations}
   \begin{subequations}\label{eq:right-boundary}
     \begin{gather}
       I^b(X) = I^{in,-} + \frac{1}{2}\left( I_{R, N_x} + \frac{3}{2}F_{R, N_x} \right)\\
-      F^b(X) = F^{in,-} - \frac{1}{4}I_{R, N_x} + \frac{1}{2}F_{R, N_x},
+      F^b(X) = F^{in,-} + \frac{1}{4}I_{R, N_x} + \frac{1}{2}F_{R, N_x},
     \end{gather}
   \end{subequations}
-
-
-  
-
 
 where
 
 \begin{gather}
   F^{in, -} = \int_{-1}^{0} \mu I^{in, -}(X, \mu)d \mu, \qquad F^{in, +} = \int_{0}^{+1} \mu I^{in, +}(0, \mu)d \mu\\
-  I^{in, -} = \int_{-1}^{0}  I^{in, -}(X, \mu)d \mu, \qquad I^{in, +} = \int_{0}^{+1}  I^{in, +}(0, \mu)d \mu
+  I^{in, -} = \int_{-1}^{0}  I^{in, -}(X, \mu)d \mu, \qquad I^{in, +} = \int_{0}^{+1}  I^{in, +}(0, \mu)d \mu\\
 \end{gather}
 
 Then, for the interior cells, from $\int_{K_i} \cdot \; b_L dx$ we obtain  
 
 \begin{subequations}\label{eq:left-equations}
   \begin{multline}
-    \left[-\frac{1}{4} \left( I_{R, i-1}^{n+1} - I_{L, i}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{LL}I_{L, i}^{n+1} + m_{LR}I_{R, i}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
-    + \left[ -\frac{1}{2}\left( F_{R, i-1}^{n+1} + F_{L,i}^{n+1}\right) + \frac{1}{2}\left( F_{L, i}^{n+1} + F_{R, i}^{n+1}\right)\right] =\\
+    \left[-\frac{1}{4} \left( I_{R, i-1}^{n+1} + I_{L, i}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{LL}I_{L, i}^{n+1} + m_{LR}I_{R, i}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
+    + \left[ -\frac{1}{2}\left( F_{R, i-1}^{n+1} - F_{L,i}^{n+1}\right) + \frac{1}{2}\left( F_{L, i}^{n+1} + F_{R, i}^{n+1}\right)\right] =\\
     \left[\eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}\left(m_{LL}I_{L, i, g}^n + m_{LR}I_{R, i, g}^n\right)\frac{\Delta x_i}{6} + \frac{1}{c\Delta t^n}\left(m_{LL}I_{L, i}^n + m_{LR}I_{R, i}^n\right)\frac{\Delta x_i}{6} \right]\\
     + \left[\left(m_{LL}q_{L, i} + m_{LR}q_{R, i}\right)\frac{\Delta x_i}{6}\right]
   \end{multline}
   \begin{multline}
     \left[\left(m_{LL}F_{L, i}^{n+1} + m_{LR}F_{R, i}^{n+1}\right)\frac{\Delta x_i}{6} -\frac{3}{4}  D_k \left( F_{R, i-1}^{n+1} - F_{L, i}^{n+1} \right)\right]\\
-    +\left[- \frac{1}{2}D_k \left( I_{R, i-1}^{n+1} - I_{L, i}^{n+1}\right)  + \frac{1}{2}D_k \left(I_{L, i}^{n+1} + I_{R, i} ^{n+1}\right)\right]=0,
+    +\left[- \frac{1}{2}D_k \left( I_{R, i-1}^{n+1} -+I_{L, i}^{n+1}\right)  + \frac{1}{2}D_k \left(I_{L, i}^{n+1} + I_{R, i} ^{n+1}\right)\right]=0,
   \end{multline}
 \end{subequations}
 
-and from $\int_{K_i} \cdot \; b_R dx$, 
+for $i=2,\hdots, N_x$, and from $\int_{K_i} \cdot \; b_R dx$, 
 
 
 \begin{subequations}\label{eq:right-equations}
   \begin{multline}
-    \left[\frac{1}{4} \left( I_{R, i}^{n+1} - I_{L, i+1}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{RL}I_{L, i}^{n+1} + m_{RR}I_{R, i}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
-    + \left[ \frac{1}{2}\left( F_{R, i}^{n+1} + F_{L,i+1}^{n+1}\right) - \frac{1}{2}\left( F_{L, i}^{n+1} + F_{R, i}^{n+1}\right)\right] =\\
+    \left[\frac{1}{4} \left( I_{R, i}^{n+1} + I_{L, i+1}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{RL}I_{L, i}^{n+1} + m_{RR}I_{R, i}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
+    + \left[ \frac{1}{2}\left( F_{R, i}^{n+1} - F_{L,i+1}^{n+1}\right) - \frac{1}{2}\left( F_{L, i}^{n+1} + F_{R, i}^{n+1}\right)\right] =\\
     \left[\eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}\left(m_{RL}I_{L, i, g}^n + m_{RR}I_{R, i, g}^n\right)\frac{\Delta x_i}{6} + \frac{1}{c\Delta t^n}\left(m_{RL}I_{L, i}^n + m_{RR}I_{R, i}^n\right)\frac{\Delta x_i}{6} \right]\\
     + \left[\left(m_{RL}q_{L, i} + m_{RR}q_{R, i}\right)\frac{\Delta x_i}{6}\right]
   \end{multline}
   \begin{multline}
-    \left[\left(m_{RL}F_{L, i}^{n+1} + m_{RR}F_{R, i}^{n+1}\right)\frac{\Delta x_i}{6} +\frac{3}{4}  D_k \left( F_{R, i}^{n+1} - F_{L, i+1}^{n+1} \right)\right]\\
-    +\left[\frac{1}{2}D_k \left( I_{R, i-1}^{n+1} - I_{L, i}^{n+1}\right)  - \frac{1}{2}D_k \left(I_{L, i}^{n+1} + I_{R, i} ^{n+1}\right)\right]=0.
+    \left[\left(m_{RL}F_{L, i}^{n+1} + m_{RR}F_{R, i}^{n+1}\right)\frac{\Delta x_i}{6} + \frac{3}{4}  D_k \left( F_{R, i}^{n+1} - F_{L, i+1}^{n+1} \right)\right]\\
+    +\left[\frac{1}{2}D_k \left( I_{R, i}^{n+1} + I_{L, i+1}^{n+1}\right)  - \frac{1}{2}D_k \left(I_{L, i}^{n+1} + I_{R, i} ^{n+1}\right)\right]=0.
   \end{multline}
 \end{subequations}
 
-In the left boundary cell, using \autoref{eq:left-boundary}, we have
+for $i=1, \hdots, (N_x - 1)$. In the left boundary cell, using \autoref{eq:left-boundary}, we have
 
 \begin{subequations}
   \begin{multline}
     \left[\frac{1}{4} \left( I_{L, 1}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{LL}I_{L, 1}^{n+1} + m_{LR}I_{R, 1}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
-    + \left[ -\frac{1}{2}\left( F_{L,1}^{n+1}\right) + \frac{1}{2}\left( F_{L, 1}^{n+1} + F_{R, 1}^{n+1}\right)\right] =\\
+    + \left[ -\frac{1}{2}\left( -F_{L,1}^{n+1}\right) + \frac{1}{2}\left( F_{L, 1}^{n+1} + F_{R, 1}^{n+1}\right)\right] =\\
     \left[\eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}\left(m_{LL}I_{L, 1, g}^n + m_{LR}I_{R, 1, g}^n\right)\frac{\Delta x_i}{6} + \frac{1}{c\Delta t^n}\left(m_{LL}I_{L, 1}^n + m_{LR}I_{R, 1}^n\right)\frac{\Delta x_i}{6} \right]\\
     + \left[\left(m_{LL}q_{L, 1} + m_{LR}q_{R, 1}\right)\frac{\Delta x_i}{6}\right] + F^{in, +, n}
   \end{multline}
   \begin{multline}
-    \left[\left(m_{LL}F_{L, 1}^{n+1} + m_{LR}F_{R, 1}^{n+1}\right)\frac{\Delta x_i}{6} -\frac{3}{4}  D_k \left( - F_{L, 1}^{n+1} \right)\right]\\
-    +\left[ \frac{1}{2}D_k \left(  I_{L, 1}^{n+1}\right)  + \frac{1}{2}D_k \left(I_{L, 1}^{n+1} + I_{R, 1} ^{n+1}\right)\right]=E^{in, +, n},
+    \left[\left(m_{LL}F_{L, 1}^{n+1} + m_{LR}F_{R, 1}^{n+1}\right)\frac{\Delta x_i}{6} + \frac{3}{4}  D_k \left( F_{L, 1}^{n+1} \right)\right]\\
+    +\left[ -\frac{1}{2}D_k \left(  I_{L, 1}^{n+1}\right)  + \frac{1}{2}D_k \left(I_{L, 1}^{n+1} + I_{R, 1} ^{n+1}\right)\right]= D I^{in, +, n},
   \end{multline}
 \end{subequations}
 
@@ -604,7 +600,7 @@ and in the right boundary cell, using \autoref{eq:right-boundary}, we have
 
 
 
-\begin{subequations}\label{eq:right-equations}
+\begin{subequations}
   \begin{multline}
     \left[\frac{1}{4} \left( I_{R, {N_x}}^{n+1}\right) + \left(\sigma_a^n + \sigma_{f,k}^n \right) \left(m_{RL}I_{L, {N_x}}^{n+1} + m_{RR}I_{R, {N_x}}^{n+1}\right)\frac{\Delta x_i}{6}\right] \\
     + \left[ \frac{1}{2}\left( F_{R, {N_x}}^{n+1} \right) - \frac{1}{2}\left( F_{L, {N_x}}^{n+1} + F_{R, {N_x}}^{n+1}\right)\right] =\\
@@ -613,17 +609,150 @@ and in the right boundary cell, using \autoref{eq:right-boundary}, we have
   \end{multline}
   \begin{multline}
     \left[\left(m_{RL}F_{L, {N_x}}^{n+1} + m_{RR}F_{R, {N_x}}^{n+1}\right)\frac{\Delta x_i}{6} +\frac{3}{4}  D_k \left( F_{R, {N_x}}^{n+1} \right)\right]\\
-    +\left[\frac{1}{2}D_k \left( I_{R, {N_x}-1}^{n+1} \right)  - \frac{1}{2}D_k \left(I_{L, {N_x}}^{n+1} + I_{R, {N_x}} ^{n+1}\right)\right]= -E^{in, -, n}.
+    +\left[\frac{1}{2}D_k \left( I_{R, {N_x}-1}^{n+1} \right)  - \frac{1}{2}D_k \left(I_{L, {N_x}}^{n+1} + I_{R, {N_x}} ^{n+1}\right)\right]= -DI^{in, -, n}.
   \end{multline}
 \end{subequations}
 
+The local interior equations can be represented as the block matrix
+
+\begin{equation}
+  \begin{bmatrix}
+    \left(\mat{B}_{0,I} + \sigma\Delta x_i \mat{M}_w\right) & (\mat{B}_{0, F} + \mat{A})\\
+    (D_{i} \mat{B}_{1,I} + D_i \mat{A}) & (\Delta x_i \mat{M}_w + D_{i} \mat{B}_{1, F})
+  \end{bmatrix}\begin{bmatrix}
+    I\\
+    F
+  \end{bmatrix} =
+  \begin{bmatrix}
+    S\\
+    0
+  \end{bmatrix}
+\end{equation}
+
+where
+
+\begin{gather}
+  \mat{B}_{0,I} = \begin{bmatrix}
+    -1/4 & -1/4 & 0 & 0\\
+    0 & 0 & 1/4 & 1/4
+  \end{bmatrix}\\
+  \mat{B}_{0, F} = \begin{bmatrix}
+    -1/2 & 1/2 & 0 & 0\\
+    0 & 0 & 1/2 & -1/2
+  \end{bmatrix}\\
+  \mat{B}_{1,I} = \begin{bmatrix}
+    -1/2 & -1/2 & 0 & 0\\
+    0 & -0 & 1/2 & 1/2
+  \end{bmatrix}\\
+  \mat{B}_{1,F} = \begin{bmatrix}
+    -3/4 & 3/4 & 0 & 0\\
+    0 & 0 & 3/4 & -3/4
+  \end{bmatrix}\\
+  \mat{A} = \begin{bmatrix}
+    0 & 1/2 & 1/2 & 0 \\
+    0 & -1/2 & -1/2 & 0
+  \end{bmatrix}
+  \mat{M}_w = \begin{bmatrix}
+    0 & m_{LL} & m_{LR} & 0 \\
+    0 & m_{RL} & m_{RR} & 0 
+  \end{bmatrix}
+\end{gather}
+
+\begin{equation}
+  I = \begin{bmatrix}
+    I_{R, i-1}\\
+    I_{L, i}\\
+    I_{R, i}\\
+    I_{L, i+1}
+  \end{bmatrix}
+  F = \begin{bmatrix}
+    F_{R, i-1}\\
+    F_{L, i}\\
+    F_{R, i}\\
+    F_{L, i+1}
+  \end{bmatrix}
+\end{equation}
+
+\begin{equation}
+  S = \begin{bmatrix}
+    S_L\\
+    S_R
+  \end{bmatrix}.
+\end{equation}
+
+On the left boundary, 
+
+\begin{equation}
+  \begin{bmatrix}
+    \left(\mat{B}_{0,I}^{L} + \sigma\Delta x_i \mat{M}^{L}\right) & (\mat{B}_{0, F}^{L} + \mat{A}_F^{L})\\
+    (D_{i} \mat{B}_{1,I}^{L} + \mat{A}^{L}) & (\Delta x_i \mat{M}^{L} + D_{i} \mat{B}_{1, F}^{L})
+  \end{bmatrix}\begin{bmatrix}
+    I^{L}\\
+    F^{L}
+  \end{bmatrix} =
+  \begin{bmatrix}
+    S_I^{L}\\
+    S_F^{L}
+  \end{bmatrix}
+\end{equation}
+
+and on the right boundary, 
 
 
+\begin{equation}
+  \begin{bmatrix}
+    \left(\mat{B}_{0,I}^{R} + \sigma\Delta x_i \mat{M}^{R}\right) & (\mat{B}_{0, F}^{R} + \mat{A}_F^{R})\\
+    (D_{i} \mat{B}_{1,I}^{R} + D_i \mat{A}^R) & (\Delta x_i \mat{M}^{R} + D_{i} \mat{B}_{1, F}^{R})
+  \end{bmatrix}\begin{bmatrix}
+    I^{R}\\
+    F^{R}
+  \end{bmatrix} =
+  \begin{bmatrix}
+    S_I^{R}\\
+    S_F^{R}
+  \end{bmatrix},
+\end{equation}
 
+where, for each matrix, $^L$ denotes the last three columns only, $^R$ denotes the first three columns only, and
 
-
-
-
+\begin{gather}
+  I^L = \begin{bmatrix}
+    I_{L, 1}\\
+    I_{R, 1}\\
+    I_{L, 2}
+  \end{bmatrix} \quad
+  F^L = \begin{bmatrix}
+    F_{L, 1}\\
+    F_{R, 1}\\
+    F_{L, 2}
+  \end{bmatrix}\\
+  I^R = \begin{bmatrix}
+    I_{R, N_x -1}\\
+    I_{L, N_x}\\
+    I_{R, N_x}
+  \end{bmatrix} \quad
+  F^R = \begin{bmatrix}
+    F_{R, N_x -1}\\
+    F_{L, N_x}\\
+    F_{R, N_x}
+  \end{bmatrix}\\
+  S_I^L = \begin{bmatrix}
+    S_{1, L} + F^{in, +, n}\\
+    S_{1, R}
+  \end{bmatrix} \quad
+  S_F^L = \begin{bmatrix}
+    D_1I^{in, +, n}\\
+    0
+  \end{bmatrix}\\
+  S_I^R = \begin{bmatrix}
+    S_{N_x, L} \\
+    S_{N_X, R} - F^{in, -, n}
+  \end{bmatrix} \quad
+  S_F^R = \begin{bmatrix}
+    0\\
+    - D_{N_X}I^{in, -, n}
+  \end{bmatrix}
+\end{gather}
 
 \section{Next section}
 
@@ -635,3 +764,7 @@ t~\cite{fleck1971implicit}
 
 
 \end{document}
+
+
+|A B| x = u
+|C D| y   0
