@@ -32,6 +32,11 @@ def group_planck(mesh, T):
     else:
         t = numpy.tile(T, (mesh.ng+1, mesh.nx))
     g = numpy.tile(groups, (1, mesh.nx))
+
+    # print(numpy.diff(cumulative_sigma(mesh, t, g), axis=0) * (2*pi*(K)**4)/(H**3*C**2))
+    # print("sigma")
+    # print(numpy.sum(numpy.diff(cumulative_sigma(mesh, t, g), axis=0), axis=0)* (2*pi*(K)**4)/(H**3*C**2))
+    # print("sum sigma")
     
     return (4*pi)*(1/pi)*((2*pi*(K*t[1:])**4)/(H**3*C**2)) *numpy.diff(cumulative_sigma(mesh, t, g), axis=0)
 

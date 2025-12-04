@@ -8,8 +8,11 @@ import physics # type: ignore
 import matplotlib
 import matplotlib.pyplot as plt
 from itertools import cycle
+import copy
 
 
+
+numpy.set_printoptions(precision=2)
 
 
 # Define temperature-dependent coefficients as functions
@@ -44,7 +47,7 @@ def FC_heatcap(T_b, mesh):
 scale = tools.Scales()
 mesh = tools.Discretization()
 
-k_star = 27
+k_star = 27e2
 
 # scale.I = 1
 
@@ -63,7 +66,7 @@ mesh.F_BC = numpy.zeros((mesh.ng, 2))
 
 mesh.dt = 2e-3 * 1e-8 # seconds
 
-mesh.eps = 1e-16
+mesh.eps = 1e-15
 
 
 
@@ -80,15 +83,19 @@ mesh.eps = 1e-16
 
 
 T_prev = (1/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
+T_bound = (1000/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
 kappa = group_FC_opacity(mesh, T_prev, k_star)
 
-Cv    = FC_heatcap(1, mesh)
+Cv    = FC_heatcap(1/physics.K, mesh)
+
+print(Cv)
+print("Cv")
 
 Q     = numpy.zeros((mesh.ng, mesh.nx))
 
 
-mesh.I_BC[:, 0] = (physics.group_planck(mesh, 1000*T_prev))[:, 0]
-mesh.F_BC[:, 0] = 0.5*(physics.group_planck(mesh, 1000*T_prev))[:, 0]
+mesh.I_BC[:, 0] = (physics.group_planck(mesh, T_bound))[:, 0]
+mesh.F_BC[:, 0] = 0.5*(physics.group_planck(mesh, T_bound))[:, 0]
 
 print(mesh.I_BC[:, 0])
 print("bound")
@@ -107,50 +114,89 @@ sol_prev.intensity[:,:] = tools.dbl(physics.group_planck(mesh, T_prev))
 
 # print("initial condition")
 
-
 coeff = tools.MG_coefficients(mesh)
 coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
 
+print(coeff.beta[:, 0])
+print(coeff.db_dt[:, 0])
 
-
-b = tools.Transport_solution(mesh)
-b.vec[:,:]  = method.unaccelerated_loop(mesh, sol_prev, T_prev, kappa, Cv, Q)
-
-print(Cv)
-print("Cv")
-
-
-test = method.update_temperature(mesh, coeff, b, Cv)
-print(test)
-print("temp update")
-
-
-T_prev = T_prev + test
-
-# print(T_prev)
-# print("new temp")
-
-newcoeff = tools.MG_coefficients(mesh)
-newcoeff.assign(mesh, kappa, b, T_prev, Cv, Q)
-
-kappa = group_FC_opacity(mesh, T_prev, k_star)
-
-c = tools.Transport_solution(mesh)
-c.vec[:,:] = method.unaccelerated_loop(mesh, b, T_prev, kappa, Cv, Q)
+print("beta and dbdt")
 
 
 
 
+
+ans = method.global_mat_elementwise(mesh, coeff.sig_a + coeff.sig_f[0], coeff.D[0])
+# ans2 = method.assemble_global_matrix(mesh, coeff.sig_a + coeff.sig_f[0], coeff.D[0])
+
+# madiff = ans - ans2
+
+
+# plt.figure()
+# plt.spy(ans)
+# plt.title("element wise assembly")
+
+# plt.figure()
+# plt.spy(ans2)
+# plt.title("local matrix assembly")
+
+plt.figure()
+plt.matshow(ans.todense())
+
+# print(madiff.todense())
+# plt.show()
+
+# mat = method.assemble_global_matrix(mesh, coeff.sig_a + coeff.sig_f[0], coeff.D[0])
+
+# plt.figure()
+# plt.spy(mat.todense())
+# plt.show()
 
 
 
 
 plt.figure()
+
+change = T_prev.copy()
+b = tools.Transport_solution(mesh)
+
+solutions = []
+solutions.append(copy.deepcopy(b))
+
+plt.plot(mesh.cell_centers, T_prev*physics.K, label=f"{0:.2e}")
+
+for t in range(0, 10):
+    kappa = group_FC_opacity(mesh, T_prev, k_star)
+    
+
+    b.vec[:,:]  = method.unaccelerated_loop(mesh, sol_prev, T_prev, kappa, Cv, Q)
+
+    solutions.append(copy.deepcopy(b))
+
+    sol_prev.vec[:] = b.vec[:]
+    coeff = tools.MG_coefficients(mesh)
+    coeff.assign(mesh, kappa, b, T_prev, Cv, Q)
+
+    print(b.intensity[0])
+    print("cell edges")
+
+    print(b.cell_center_i[0])
+    print("center intensity input")
+
+    change[:] = method.update_temperature(mesh, coeff, b, Cv)
+    print(change)
+    print("Change")
+
+    T_prev = T_prev + change[:]
+
+    
+plt.figure()
 ax = plt.gca()
 lines = tools.LD_plottable(mesh, b.vec)
-tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
+tools.plot_LD_groups(mesh, lines.intensity, [0])
 plt.title("b, intensity")
 ax.autoscale()
+
 
 
 plt.figure()
@@ -160,8 +206,20 @@ tools.plot_LD_groups(mesh, lines.flux, range(0, mesh.ng))
 plt.title("b, flux")
 ax.autoscale()
 
-plt.show()
 
+plt.figure()
+ax = plt.gca()
+
+for i in range(0, len(solutions)):
+    lines = tools.LD_plottable(mesh, solutions[i].vec)
+    tools.plot_LD_groups(mesh, lines.intensity, [0])
+plt.title("intensity over time")
+ax.autoscale()
+
+
+
+
+plt.show()
 
 
 def planck(T, nu):
