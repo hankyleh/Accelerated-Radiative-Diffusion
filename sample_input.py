@@ -51,17 +51,19 @@ k_star = 27
 mesh.groups = numpy.array([0.000, 0.7075, 1.415, 2.123, 2.830, 3.538, 4.245,
     5.129, 6.014, 6.898, 7.783, 8.667, 9.551, 10.44, 11.32, 12.20, 
     13.09, 1e4])*(1000/H)
-mesh.dx = 0.8
+mesh.dx = 0.4
 
 mesh.I_BC = numpy.zeros((mesh.ng, 2))
 mesh.F_BC = numpy.zeros((mesh.ng, 2))
 
-mesh.I_BC[:, 0] = 0.5*physics.group_planck(mesh, 1000/physics.K)[:, 0]
-mesh.F_BC[:, 0] = 0.5*physics.group_planck(mesh, 1000/physics.K)[:, 0]
+# mesh.I_BC[:, 0] = 0.5*physics.group_planck(mesh, 1000/physics.K)[:, 0]
+# mesh.F_BC[:, 0] = 0.5*physics.group_planck(mesh, 1000/physics.K)[:, 0]
+
+
 
 mesh.dt = 2e-3 * 1e-8 # seconds
 
-mesh.eps = 1e-20
+mesh.eps = 1e-16
 
 
 
@@ -80,21 +82,28 @@ mesh.eps = 1e-20
 T_prev = (1/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
 kappa = group_FC_opacity(mesh, T_prev, k_star)
 
-Cv    = FC_heatcap(1/physics.K, mesh)
+Cv    = FC_heatcap(1, mesh)
 
 Q     = numpy.zeros((mesh.ng, mesh.nx))
 
 
+mesh.I_BC[:, 0] = (physics.group_planck(mesh, 1000*T_prev))[:, 0]
+mesh.F_BC[:, 0] = 0.5*(physics.group_planck(mesh, 1000*T_prev))[:, 0]
+
+print(mesh.I_BC[:, 0])
+print("bound")
 
 # print(physics.group_planck(mesh, T_prev))
+
 
 
 sol_prev = tools.Transport_solution(mesh)
 
 sol_prev.intensity[:,:] = tools.dbl(physics.group_planck(mesh, T_prev))
+# sol_prev.intensity[0:2,0:4] = 3*tools.dbl(physics.group_planck(mesh, T_prev))[0:2,0:4]
 
-print(sol_prev.vec[0])
-print("initial")
+# print(sol_prev.vec[0])
+# print("initial")
 
 # print("initial condition")
 
@@ -107,22 +116,30 @@ coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
 b = tools.Transport_solution(mesh)
 b.vec[:,:]  = method.unaccelerated_loop(mesh, sol_prev, T_prev, kappa, Cv, Q)
 
-print(b.vec[0])
-print("b")
+print(Cv)
+print("Cv")
+
+
+test = method.update_temperature(mesh, coeff, b, Cv)
+print(test)
+print("temp update")
+
+
+T_prev = T_prev + test
+
+# print(T_prev)
+# print("new temp")
 
 newcoeff = tools.MG_coefficients(mesh)
 newcoeff.assign(mesh, kappa, b, T_prev, Cv, Q)
+
+kappa = group_FC_opacity(mesh, T_prev, k_star)
 
 c = tools.Transport_solution(mesh)
 c.vec[:,:] = method.unaccelerated_loop(mesh, b, T_prev, kappa, Cv, Q)
 
 
 
-
-
-
-test = method.update_temperature(mesh, coeff, b, Cv)
-print(test*physics.K)
 
 
 
@@ -136,15 +153,14 @@ plt.title("b, intensity")
 ax.autoscale()
 
 
-
 plt.figure()
 ax = plt.gca()
 lines = tools.LD_plottable(mesh, b.vec)
 tools.plot_LD_groups(mesh, lines.flux, range(0, mesh.ng))
 plt.title("b, flux")
 ax.autoscale()
-plt.show()
 
+plt.show()
 
 
 

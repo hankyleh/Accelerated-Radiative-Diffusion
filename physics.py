@@ -51,22 +51,19 @@ def cumulative_dsigma_dT(mesh, T, nu):
 def group_dB_dT(mesh, T):
     
     groups = mesh.groups[:, numpy.newaxis].reshape((mesh.ng+1, 1))
-    T.reshape((1, mesh.nx))
+    if numpy.size(T) != 1:
+        T.reshape((1, mesh.nx))
+        t = numpy.tile(T, (mesh.ng+1, 1))
+    else:
+        t = numpy.tile(T, (mesh.ng+1, mesh.nx))
     g = numpy.tile(groups, (1, mesh.nx))
-    t = numpy.tile(T, (mesh.ng+1, 1))
 
     return (
 
         (4*pi)*(1/pi)*(
-            ((2*pi*(K*t[1:])**4)/(H**3*C**2))*numpy.diff(cumulative_sigma(mesh, t, g), axis=0)
+            ((2*pi*(K*t[1:])**4)/(H**3*C**2))*numpy.diff(cumulative_dsigma_dT(mesh, t, g), axis=0)
             +
-            ((8*pi*K*(K*t[1:])**3)/(H**3*C**2))*numpy.diff(cumulative_dsigma_dT(mesh, t, g), axis=0)
+            ((8*pi*K*(K*t[1:])**3)/(H**3*C**2))*numpy.diff(cumulative_sigma(mesh, t, g), axis=0)
 
         )
     )
-
-
-
-    #     (8*pi*(K*t[1:, :])**3)
-    #     *numpy.diff(cumulative_dsigma_dT(mesh, t, g), axis=0))/((H**2)*(C**2))
-    # + ((24*pi*K*(K*t[1:, :])**2)*numpy.diff(cumulative_sigma(mesh, t, g), axis=0))/((H**2)*(C**2))

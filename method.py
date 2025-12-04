@@ -110,7 +110,7 @@ def get_HO_source(
                 * dx * mass_global @ numpy.sum(fiss, axis=0)))
     # add BCs
     source[0] += mesh.F_BC[k, 0]
-    source[(2*mesh.nx)-1] += - mesh.F_BC[k, 1]
+    source[(2*mesh.nx)-1] += mesh.F_BC[k, 1]
 
     source[2*mesh.nx] += coeff.D[k, 0]*mesh.I_BC[k, 0]
     source[-1] +=        -coeff.D[k, -1]*mesh.I_BC[k, 1]
@@ -158,9 +158,18 @@ def unaccelerated_loop(mesh : tools.Discretization,
                        kappa, 
                        Cv, 
                        Q):
+    print(T_prev)
+    print("temperature")
+
     coeff = tools.MG_coefficients(mesh)
     I_prev = sol_prev.intensity[:]
     coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
+
+    print(coeff.S[0])
+    print("Reemission source")
+
+    print(coeff.q[0])
+    print("q source")
     
 
     
@@ -175,21 +184,40 @@ def unaccelerated_loop(mesh : tools.Discretization,
     change = [1]
     iter = 0
 
-    while (numpy.max(change) > mesh.eps) :
+    while (numpy.max(change) > mesh.eps) and (iter < 4) :
         iter += 1
         print(f"Iteration {iter}, change = {numpy.max(change)}")
 
         for k in range(0, mesh.ng):
             sys = high_order_assembly(mesh, coeff, last_iteration[:, :2*mesh.nx], k)
             if k== 0:
-                print(sys.src)
-                print("source")
+                numpy.set_printoptions(precision=2)
+                # print(sys.mat.todense())
+                # print("matrix")
+
+                # print(sys.src)
+                # print("source")
+
+                # print(sparse.linalg.inv(sys.mat) @ sys.src)
+                # print("Direct solution")
     
 
-            updated_solution[k, :], b = sparse.linalg.lgmres(sys.mat, sys.src, atol=mesh.eps, x0=last_iteration[k])
-
+            updated_solution[k, :], b = sparse.linalg.lgmres(sys.mat, sys.src, atol=mesh.eps, rtol = mesh.eps, x0=last_iteration[k])
         if b !=0:
             print(f"GMRES error, {b}")
+        
+        # print(f"Call = {iter}")
+
+        # if iter ==1:
+        #     print("Iteration 1 complete")
+        #     print("Intensity group 0, cells 0-3:")
+        #     print("  Left values:", updated_solution[0, 0:6:2])
+        #     print("  Right values:", updated_solution[0, 1:6:2])
+        #     print("Flux group 0, cells 0-3:")
+        #     print("  Left values:", updated_solution[0, 2*mesh.nx:2*mesh.nx+6:2])
+        #     print("  Right values:", updated_solution[0, 2*mesh.nx+1:2*mesh.nx+6:2])
+
+        
         diff =  abs(updated_solution - last_iteration)
         diff = diff / numpy.maximum(abs(last_iteration), 1e-10)
         change = numpy.linalg.norm(diff, 2, axis=0)
@@ -226,14 +254,25 @@ def update_temperature(mesh : tools.Discretization,
                        Q = 0):
     # TODO
 
- 
-    dt = (
+    print(soln.cell_center_i[0])
+    print("intensity")
+    print(coeff.beta[0])
+    print("beta")
+    print(coeff.kappa[0] * (soln.cell_center_i[0] - coeff.beta[0]))
+    print("diff")
+
+    print((Cv/mesh.dt))
+    print("Cv/dt")
+
+    print(numpy.sum(coeff.kappa * coeff.db_dt, axis = 0))
+    print("kappa * dbdt")
+    temp = (
         numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0) + Q
     )/(
         (Cv/mesh.dt) + numpy.sum(coeff.kappa * coeff.db_dt, axis = 0)
     )
 
-    return dt
+    return temp
 
     # calculate planck function, dbdt, all necessary constants
 
