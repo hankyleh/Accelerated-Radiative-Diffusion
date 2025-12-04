@@ -9,11 +9,11 @@ from itertools import cycle
 from physics import C, SIG_R, A_R, H
 
 
-b_0i = numpy.array([[-0.25, -0.25, 0,     0   ],
-                        [0,     0,    0.25, 0.25]])
+b_0i = numpy.array([[-0.25, 0.25, 0,     0   ],
+                    [0,     0,    0.25, -0.25]])
     
-b_0f = numpy.array([[-0.5,  0.5, 0,    0  ],
-                    [0,     0,   0.5, -0.5]])
+b_0f = numpy.array([[-0.5,  -0.5, 0,   0  ],
+                    [0,     0,    0.5, 0.5]])
 
 b_1i = numpy.array([[-0.5, -0.5,    0,   0  ],
                     [ 0,    0,      0.5, 0.5]])
@@ -23,6 +23,11 @@ b_1f = numpy.array([[-0.75, 0.75, 0,     0   ],
 
 a_f  = numpy.array([[0,  0.5,  0.5, 0],
                      [0, -0.5, -0.5, 0]])
+
+M    = (1/6)*numpy.array([[2, 1],
+                              [1, 2]])
+M_wide = (1/6)*numpy.array([[0, 2, 1, 0],
+                              [0, 1, 2, 0]])
 
 colors = cycle(['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
                            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'])
@@ -51,11 +56,11 @@ class Transport_solution:
 
     @property
     def flux(self):
-        return self.vec[:, 2:self._nx:]
+        return self.vec[:, 2*self._nx:]
     
     @flux.setter
     def flux(self, value):
-        self.vec[:, 2:self._nx:] = value
+        self.vec[:, 2*self._nx:] = value
 
     @property
     def cell_center_i(self):
@@ -147,34 +152,34 @@ class MG_coefficients:
         self.q   = numpy.zeros((mesh.ng, mesh.nx))
         self.kappa = numpy.zeros((mesh.ng, mesh.nx))
         self.beta  = numpy.zeros((mesh.ng, mesh.nx))
-        self.dB_dT = numpy.zeros((mesh.ng, mesh.nx))
-        self.S = numpy.zeros((mesh.ng, mesh.nx))
+        self.db_dt = numpy.zeros((mesh.ng, mesh.nx))
+        self.S = numpy.zeros((mesh.ng, 2*mesh.nx))
         self.D = numpy.zeros((mesh.ng, mesh.nx))
 
 
-    def assign(self, mesh, kappa, sol_prev : Transport_solution, T_prev, Cv, Q):
-        self.kappa = kappa
-        I_prev = sol_prev.intensity
-        self.db_dt = physics.group_dB_dT(mesh, T_prev)
-        self.beta = physics.group_planck(mesh, T_prev)
+    def assign(self, mesh : Discretization, kappa, sol_prev : Transport_solution, T_prev, Cv, Q):
+        self.kappa[:,:] = kappa.copy()
+        I_prev = sol_prev.intensity.copy()
+        self.db_dt[:,:] = physics.group_dB_dT(mesh, T_prev)
+        self.beta[:,:] = physics.group_planck(mesh, T_prev)
 
         self.sig_a = 1/(mesh.C*mesh.dt)
-        self.sig_f = kappa
+        self.sig_f[:,:] = kappa.copy()
 
-        self.chi = (kappa * self.db_dt) / numpy.sum(kappa * self.db_dt)
-
-        self.eta = (numpy.sum(kappa * self.db_dt, axis=0)
+        self.chi[:,:] = (kappa * self.db_dt) / numpy.tile(numpy.sum(kappa * self.db_dt, axis=0), reps = (mesh.ng, 1))
+        self.eta[:] = (numpy.sum(kappa * self.db_dt, axis=0)
                     /
                     ((Cv / mesh.dt)+
-                        numpy.sum(kappa * self.db_dt))
+                        numpy.sum(kappa * self.db_dt, axis=0))
                 )
-        self.q   = ((kappa * self.beta) + 
-               self.eta*self.chi*(Q - numpy.sum(kappa * self.beta)))
-        self.S = dbl(self.q) + I_prev/(mesh.C*mesh.dt)
-        self.D = 1/(3*kappa)
+        self.q[:,:]   = ((kappa * self.beta) + 
+               self.eta*self.chi*(Q - numpy.sum(kappa * self.beta, axis=0)))
+        self.S[:,:] = dbl(self.q) + I_prev/(mesh.C*mesh.dt)
+        self.D[:,:] = 1/(3*kappa)
 
 
 class LD_plottable:
+
     def __init__(self, mesh, solution):
         self.intensity = []
         self.flux = []

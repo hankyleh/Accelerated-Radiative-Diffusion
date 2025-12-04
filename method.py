@@ -13,8 +13,8 @@ def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
     # mesh -- variable of type "Discretization"
     # sigma-- numpy array of size (Nx, 1)
     # D    -- numpy array of size (Nx, 1)
-    nx = mesh.nx
-    dx = mesh.dx
+    nx = mesh.nx + 0
+    dx = mesh.dx + 0
     
     global_matrix = sparse.lil_array((4*nx, 4*nx))
     global_source = sparse.lil_array((4*nx, 1))
@@ -26,10 +26,7 @@ def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
     b_1f = tools.b_1f
     a  = tools.a_f 
 
-    M    = (1/6)*numpy.array([[2, 1],
-                              [1, 2]])
-    M_wide = (1/6)*numpy.array([[0, 2, 1, 0],
-                              [0, 1, 2, 0]])
+    M_wide = tools.M_wide
 
     local_operator = numpy.zeros((4, 4))
     intensity_op = numpy.zeros((4, 4))
@@ -37,12 +34,13 @@ def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
     # interior elements
     for i in range(1, nx-1):
         # i = index of current interior cell
+
         l_nbr = (2*i)-1
         r_nbr = (2*i)+2
         shft  = (2*nx)
 
         # zeroth moment, intensity
-        global_matrix[2*i:2*i + 2, l_nbr:r_nbr+1] += b_0i + (sigma[i]*dx*M_wide)
+        global_matrix[2*i:(2*i + 2), l_nbr:r_nbr+1] += b_0i + (sigma[i]*dx*M_wide)
 
         # zeroth moment, flux
         global_matrix[2*i:2*i + 2, l_nbr+shft:r_nbr+shft+1] += a + b_0f
@@ -88,16 +86,38 @@ def get_HO_source(
     source = numpy.zeros((4*mesh.nx))
 
     # compute fission source, add to 'S'
-    source[0:2*mesh.nx] = (coeff.S[k] 
-                + (tools.dbl(coeff.eta[k]) * tools.dbl(coeff.chi[k])
-                * numpy.sum(tools.dbl(coeff.sig_f) * prev_I, axis=0)))
-    # print(numpy.sum(tools.dbl(coeff.sig_f) * prev_soln[:, 0:2*mesh.nx], axis=0))
+    dx = mesh.dx
+    nx = mesh.nx
+    M = tools.M
+
+
+
+
+    mass_global = sparse.lil_array((2*nx, 2*nx))
+
+    for i in range(0, nx):
+        mass_global[2*i : 2*i+2, 2*i : 2*i+2] = M
+    mass_global = mass_global.tocsr()
+
+    fiss = numpy.zeros((mesh.ng, 2*nx))
+
+    for g in range(0, mesh.ng):
+        fiss[g] += tools.dbl(coeff.sig_f[g])*(prev_I[g])
+
+        
+    source[0:2*mesh.nx] = (dx*( mass_global @ coeff.S[k])
+                + (tools.dbl(coeff.eta) * tools.dbl(coeff.chi[k])
+                * dx * mass_global @ numpy.sum(fiss, axis=0)))
     # add BCs
     source[0] += mesh.F_BC[k, 0]
     source[(2*mesh.nx)-1] += - mesh.F_BC[k, 1]
 
     source[2*mesh.nx] += coeff.D[k, 0]*mesh.I_BC[k, 0]
     source[-1] +=        -coeff.D[k, -1]*mesh.I_BC[k, 1]
+
+
+
+
     return source
 
 def get_LO_source():
@@ -141,15 +161,16 @@ def unaccelerated_loop(mesh : tools.Discretization,
     coeff = tools.MG_coefficients(mesh)
     I_prev = sol_prev.intensity[:]
     coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
-
-
-
-    last_iteration = sol_prev.vec[:].copy()
-    updated_solution = numpy.zeros((mesh.ng, 4*mesh.nx))
-
-    # print(last_iteration)
     
-    # print(updated_solution.shape)
+
+    
+
+
+    updated_solution = numpy.zeros((mesh.ng, 4*mesh.nx))
+    last_iteration = numpy.zeros((mesh.ng, 4*mesh.nx))
+    last_iteration[:,:] = sol_prev.vec[:].copy()
+    
+
 
     change = [1]
     iter = 0
@@ -160,12 +181,21 @@ def unaccelerated_loop(mesh : tools.Discretization,
 
         for k in range(0, mesh.ng):
             sys = high_order_assembly(mesh, coeff, last_iteration[:, :2*mesh.nx], k)
-            updated_solution[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, rtol=mesh.eps, x0=last_iteration[k])
+            if k== 0:
+                print(sys.src)
+                print("source")
+    
 
+            updated_solution[k, :], b = sparse.linalg.lgmres(sys.mat, sys.src, atol=mesh.eps, x0=last_iteration[k])
+
+        if b !=0:
+            print(f"GMRES error, {b}")
         diff =  abs(updated_solution - last_iteration)
-        diff = diff/ (1*(last_iteration==0) + (last_iteration!=0)*last_iteration)
+        diff = diff / numpy.maximum(abs(last_iteration), 1e-10)
         change = numpy.linalg.norm(diff, 2, axis=0)
-        last_iteration = updated_solution.copy()
+        last_iteration[:] = updated_solution.copy()
+
+    
         
     return updated_solution
 
@@ -192,28 +222,11 @@ def accelerated_loop():
 def update_temperature(mesh : tools.Discretization, 
                        coeff : tools.MG_coefficients, 
                        soln : tools.Transport_solution,
-                       prev_temp,
                        Cv,
                        Q = 0):
     # TODO
 
  
-    # print(numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0))
-    # print("sum")
-
-    # print((Cv/mesh.dt))
-    # print("Cv/dt")
-
-    # print(numpy.sum(coeff.kappa * coeff.db_dt, axis = 0))
-    # print("sum dbdt")
-
-    # print(coeff.kappa)
-    # print("kappa")
-
-
-    # print(coeff.db_dt)
-    # print("dbdt")
-
     dt = (
         numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0) + Q
     )/(
