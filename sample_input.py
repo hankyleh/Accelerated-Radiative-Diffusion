@@ -190,7 +190,7 @@ plt.title("previous solution, kappa=1")
 plt.autoscale()
 
 
-kappa_test = 100*numpy.ones((mesh.nx))
+kappa_test = 1000*numpy.ones((mesh.nx))
 
 coeff = tools.MG_coefficients(mesh)
 coeff.assign(mesh, kappa_test, sol_prev, T_prev, Cv, Q)
@@ -201,21 +201,28 @@ src_test = method.get_HO_source(mesh, sol_prev.intensity, coeff, 0)
 
 sol_test.vec[:] = sparse.linalg.inv(mat_test) @ src_test
 
-# plt.figure()
-# ax = plt.gca()
-# lines = tools.LD_plottable(mesh, sol_test.vec)
-# tools.plot_LD_groups(mesh, lines.intensity, [0])
-# plt.title("Test intensity, kappa=1")
-# plt.autoscale()
+mat_test = method.global_mat_elementwise(mesh, kappa_test, 1/(3*kappa_test))
+src_test = method.get_HO_source(mesh, sol_prev.intensity, coeff, 0)
 
+sol_test.vec[:] = sparse.linalg.inv(mat_test) @ src_test
 
-# plt.figure()
-# ax = plt.gca()
-# lines = tools.LD_plottable(mesh, sol_test.vec)
-# tools.plot_LD_groups(mesh, lines.flux, range(0, mesh.ng))
-# plt.title("Test flux, kappa=1")
-# plt.autoscale()
+plt.figure()
+ax = plt.gca()
+lines = tools.LD_plottable(mesh, sol_test.vec)
+tools.plot_LD_groups(mesh, lines.intensity, [0])
+plt.title(f"Test intensity, kappa={kappa_test[0]} cm-1")
+plt.autoscale()
+plt.savefig(f"kappa{kappa_test[0]}_intensity.png")
+plt.close()
 
+plt.figure()
+ax = plt.gca()
+lines = tools.LD_plottable(mesh, sol_test.vec)
+tools.plot_LD_groups(mesh, lines.flux, range(0, mesh.ng))
+plt.title(f"Test flux, kappa={kappa_test[0]} cm-1")
+plt.autoscale()
+plt.savefig(f"kappa{kappa_test[0]}_flux.png")
+plt.close()
 
 
 # plt.show()
@@ -223,7 +230,7 @@ sol_test.vec[:] = sparse.linalg.inv(mat_test) @ src_test
 
 
 
-a = method.accelerated_loop(mesh, sol_test, T_prev, kappa, Cv, Q)
+# a = method.unaccelerated_loop(mesh, sol_test, T_prev, kappa, Cv, Q)
 
 # plt.figure()
 # plt.show()
@@ -255,23 +262,25 @@ a = method.accelerated_loop(mesh, sol_test, T_prev, kappa, Cv, Q)
 # plt.title("b, flux")
 # ax.autoscale()
 
-
-plt.figure()
-ax = plt.gca()
-
-for i in range(0, len(solutions)):
-    lines = tools.LD_plottable(mesh, solutions[i].vec)
-    tools.plot_LD_groups(mesh, lines.intensity, [0])
-plt.title("intensity over time")
-ax.autoscale()
+# plt.show()
 
 
+# plt.figure()
+# ax = plt.gca()
+
+# for i in range(0, len(solutions)):
+#     lines = tools.LD_plottable(mesh, solutions[i].vec)
+#     tools.plot_LD_groups(mesh, lines.intensity, [0])
+# plt.title("intensity over time")
+# ax.autoscale()
 
 
-plt.show()
 
-print(coeff.kappa[:])
-print("kappa")
+
+# plt.show()
+
+# print(coeff.kappa[:])
+# print("kappa")
 
 
 

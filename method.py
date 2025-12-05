@@ -335,8 +335,8 @@ def unaccelerated_loop(mesh : tools.Discretization,
         print(f"Iteration {iter}, change = {numpy.max(change)}")
 
         for k in range(0, mesh.ng):
-            sys = assemble_HO(mesh, coeff, last_iteration[:, :2*mesh.nx], k)
-            updated_solution.vec[k, :], b = sparse.linalg.lgmres(sys.mat, sys.src, atol=mesh.eps, rtol = mesh.eps, x0=last_iteration.vec[k])
+            sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
+            updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], atol = mesh.eps)
 
         last_iteration.vec[:] = copy.deepcopy(updated_solution.vec[:])
         diff = abs((updated_solution.intensity / last_iteration.intensity)- 1) 
@@ -380,7 +380,7 @@ def accelerated_loop(mesh : tools.Discretization,
 
         for k in range(0, mesh.ng):
             sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
-            updated_solution.vec[k, :], b = sparse.linalg.lgmres(sys.mat, sys.src, atol=mesh.eps, rtol = mesh.eps, x0=last_iteration.vec[k])
+            updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, atol=mesh.eps, rtol = mesh.eps, x0=last_iteration.vec[k])
 
         grey_constants.assign(mesh, coeff, updated_solution, last_iteration)
 
