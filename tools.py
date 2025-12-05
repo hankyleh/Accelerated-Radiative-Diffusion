@@ -175,7 +175,7 @@ class MG_coefficients:
         self.q[:,:]   = ((kappa * self.beta) + 
                self.eta*self.chi*(Q - numpy.sum(kappa * self.beta, axis=0)))
         self.S[:,:] = dbl(self.q) + I_prev/(mesh.C*mesh.dt)
-        self.D[:,:] = 1/(3*kappa)
+        self.D[:,:] = 1/(3*self.kappa[:,:])
 
 
 class LD_plottable:

@@ -266,13 +266,41 @@ def get_HO_source(
 
     # print(k)
     # print("k")
+
+
+    # print(coeff.S[k])
+    # print("S")
+
+    # print(coeff.q[k])
+    # print("q")
+
+
+    # print(coeff.db_dt[k])
+    # print("dbdt")
+    # print(numpy.sum(coeff.kappa * coeff.db_dt, axis=0))
+    # print("kappa * dbdt sum")
+
+    # print(f"Cv must be : {((1/coeff.eta[0]) -1) * numpy.sum(coeff.kappa * coeff.db_dt, axis=0) * mesh.dt }")
+
+
     # print(coeff.eta[0])
     # print("eta")
     # print(coeff.chi[k])
     # print("chi")
+
+    # print(numpy.sum(coeff.chi, axis=0))
+    # print("sum chi")
+    # print(f"max chi =  {numpy.max(coeff.chi)}")
+
+    # print(coeff.chi[:, 0])
+    # print("chi spectrum")
+
     # print(coeff.q[k])
     # print("q")
-    
+
+
+    # print(coeff.kappa[k]*coeff.beta[k] + (coeff.eta * coeff.chi[k] *-numpy.sum(coeff.kappa * coeff.beta, axis=0)))
+    # print("q should be this")
 
     for g in range(0, mesh.ng):
         fiss[g] += tools.dbl(coeff.sig_f[g])*(prev_I[g])
@@ -293,7 +321,7 @@ def get_HO_source(
     source[2*mesh.nx] += mesh.I_BC[k, 0]
     source[-1] +=        -mesh.I_BC[k, 1]
 
-    print("D IS SET TO ZERO FOR TESTING IN SOURCE")
+    # print("D IS SET TO ZERO FOR TESTING IN SOURCE")
 
 
 
@@ -307,9 +335,30 @@ def get_LO_source():
 def high_order_assembly(mesh : tools.Discretization, coeff : tools.MG_coefficients, last_iter_I, k):
     system = tools.Global_system()
     # system.mat = assemble_global_matrix(mesh, coeff.sig_a+coeff.sig_f[k], coeff.D[k])
-    system.mat = global_mat_elementwise(mesh, coeff.sig_a+coeff.sig_f[k], numpy.ones(coeff.D[k].size))
-    print(f"D IS SET TO ZERO FOR TESTING")
+
+    # print(coeff.sig_a+coeff.sig_f[k])
+    # print("sigma in HO assembly")
+
+    system.mat = global_mat_elementwise(mesh, coeff.sig_a+coeff.sig_f[k], coeff.D[k])
+    # print(f"D IS SET TO ZERO FOR TESTING")
     system.src = get_HO_source(mesh, last_iter_I, coeff, k)
+
+    # print(system.mat.todense()[0:6,:])
+    # print("Global matrix snippet")
+
+    # print(system.src[:])
+    # print("source")
+
+    print(coeff.D[k])
+    print("D")
+
+    print(coeff.sig_a)
+    print("sigma_a")
+    
+    print(coeff.sig_f[k])
+    print("sigma_f")
+
+
     return system
 
 def get_grey_constants():
@@ -359,12 +408,24 @@ def unaccelerated_loop(mesh : tools.Discretization,
     change = [1]
     iter = 0
 
-    while (numpy.max(change) > mesh.eps) and (iter < 4) :
+    while (numpy.max(change) > mesh.eps) :
+    # while (iter < 20) :
         iter += 1
         print(f"Iteration {iter}, change = {numpy.max(change)}")
 
+        print("spectral radius:")
+        print(coeff.eta * numpy.sum((coeff.chi * coeff.sig_f)/(coeff.sig_a + coeff.sig_f), axis=0))
+
+        print("eta:")
+        print(coeff.eta)
+
+        print("siga")
+        print(coeff.sig_a)
+
         for k in range(0, mesh.ng):
             sys = high_order_assembly(mesh, coeff, last_iteration[:, :2*mesh.nx], k)
+            # print(I_prev[k, 0:6] / (mesh.C*mesh.dt))
+            # print("S - q should be this")
 
 
             # updated_solution[k, :], b = sparse.linalg.lgmres(sys.mat, sys.src, atol=mesh.eps, rtol = mesh.eps, x0=last_iteration[k])
@@ -385,11 +446,18 @@ def unaccelerated_loop(mesh : tools.Discretization,
         #     print("  Left values:", updated_solution[0, 2*mesh.nx:2*mesh.nx+6:2])
         #     print("  Right values:", updated_solution[0, 2*mesh.nx+1:2*mesh.nx+6:2])
 
-        
-        diff =  abs(updated_solution - last_iteration)
-        diff = diff / numpy.maximum(abs(last_iteration), 1e-10)
-        change = numpy.linalg.norm(diff, 2, axis=0)
         last_iteration[:] = updated_solution.copy()
+
+        diff = abs((updated_solution / last_iteration)- 1) 
+        
+        # diff =  abs(updated_solution - last_iteration)
+        # diff = diff / numpy.maximum(abs(last_iteration), 1e-2)
+        change = numpy.linalg.norm(diff, 2, axis=1)
+        print(change)
+        print("change vector")
+        
+
+        print()
 
     
         

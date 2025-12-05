@@ -2,7 +2,7 @@ import numpy
 import scipy.integrate as integrate
 import scipy.sparse as sparse
 import tools # type: ignore
-from physics import H, K, A_R, C# type: ignore
+from physics import A_R, C# type: ignore
 import method # type: ignore
 import physics # type: ignore
 import matplotlib
@@ -21,13 +21,22 @@ numpy.set_printoptions(precision=2)
 
 def FC_opacity(T, nu, k0):
     def num_func(n):
-        return (H**3)*(n**7)*(1-numpy.exp(-H*n/(K*T)))**-2
+        return (n**7)*(1-numpy.exp(-physics.H*n/(physics.K*T)))**-3
     def dem_func(n):
-        return (n**4)*(1-numpy.exp(-H*n/(K*T)))**-2
+        return (n**4)*(1-numpy.exp(-physics.H*n/(physics.K*T)))**-2
+    
+    
 
     numerator, err = integrate.quad(num_func, nu[0], nu[1])
     denominator, err = integrate.quad(dem_func, nu[0], nu[1])
-    return k0 * denominator/numerator
+
+    if numerator == 0:
+        print(T)
+        print(nu)
+        print(numerator)
+        print(denominator)
+
+    return (1000*3)*k0 * denominator/(numerator*((physics.H)**3))
 
 def group_FC_opacity(mesh, T, k0):
     kappa = numpy.zeros((mesh.ng, mesh.nx))
@@ -44,16 +53,27 @@ def FC_heatcap(T_b, mesh):
 # Units for scaling computations, such that
 # x_physical = x_working * scale_x
 
+
+
+# test_kappa = FC_opacity(1/physics.K, [2000, 2002]/physics.H, 27)
+# print(test_kappa)
+
+# plt.figure()
+# plt.show()
+
+
+
+
 scale = tools.Scales()
 mesh = tools.Discretization()
 
-k_star = 27e2
+k_star = 27
 
 # scale.I = 1
 
 mesh.groups = numpy.array([0.000, 0.7075, 1.415, 2.123, 2.830, 3.538, 4.245,
     5.129, 6.014, 6.898, 7.783, 8.667, 9.551, 10.44, 11.32, 12.20, 
-    13.09, 1e4])*(1000/H)
+    13.09, 1e4])*(1000/physics.H)
 mesh.dx = 0.4
 
 mesh.I_BC = numpy.zeros((mesh.ng, 2))
@@ -64,13 +84,23 @@ mesh.F_BC = numpy.zeros((mesh.ng, 2))
 
 
 
-mesh.dt = 2e-3 * 1e-8 # seconds
+mesh.dt = 2e-1 * 1e-8 # seconds
 
-mesh.eps = 1e-15
-
-
+mesh.eps = 1e-14
 
 
+
+print(mesh.groups)
+print("groups, hz")
+
+print(mesh.groups * physics.H)
+print("groups, eV")
+
+
+
+
+# plt.figure()
+# plt.show()
 
 
 
@@ -86,13 +116,15 @@ T_prev = (1/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
 T_bound = (1000/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
 kappa = group_FC_opacity(mesh, T_prev, k_star)
 
+
 Cv    = FC_heatcap(1/physics.K, mesh)
+
 
 print(Cv)
 print("Cv")
+print("NTOE Cv has been modified-- check back later")
 
 Q     = numpy.zeros((mesh.ng, mesh.nx))
-
 
 mesh.I_BC[:, 0] = (physics.group_planck(mesh, T_bound))[:, 0]
 mesh.F_BC[:, 0] = 0.5*(physics.group_planck(mesh, T_bound))[:, 0]
@@ -102,60 +134,35 @@ print("bound")
 
 # print(physics.group_planck(mesh, T_prev))
 
+kappa = group_FC_opacity(mesh, T_prev, k_star)
+coeff = tools.MG_coefficients(mesh)
 
 
 sol_prev = tools.Transport_solution(mesh)
-
 sol_prev.intensity[:,:] = tools.dbl(physics.group_planck(mesh, T_prev))
-# sol_prev.intensity[0:2,0:4] = 3*tools.dbl(physics.group_planck(mesh, T_prev))[0:2,0:4]
+print(sol_prev.intensity[:,0:6])
 
-# print(sol_prev.vec[0])
-# print("initial")
-
-# print("initial condition")
-
-coeff = tools.MG_coefficients(mesh)
 coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
 
-print(coeff.beta[:, 0])
-print(coeff.db_dt[:, 0])
-
-print("beta and dbdt")
-
-
-
-
-
-ans = method.global_mat_elementwise(mesh, coeff.sig_a + coeff.sig_f[0], coeff.D[0])
-# ans2 = method.assemble_global_matrix(mesh, coeff.sig_a + coeff.sig_f[0], coeff.D[0])
-
-# madiff = ans - ans2
-
-
-# plt.figure()
-# plt.spy(ans)
-# plt.title("element wise assembly")
-
-# plt.figure()
-# plt.spy(ans2)
-# plt.title("local matrix assembly")
-
-plt.figure()
-plt.matshow(ans.todense())
-
-# print(madiff.todense())
-# plt.show()
-
-# mat = method.assemble_global_matrix(mesh, coeff.sig_a + coeff.sig_f[0], coeff.D[0])
-
-# plt.figure()
-# plt.spy(mat.todense())
-# plt.show()
-
-
+# print(kappa[:,0])
+# print("kappa original")
+# print(coeff.kappa[:,0])
+# print("coeff kappa")
+# print(coeff.D[:, 0])
+# print("D, coeff")
 
 
 plt.figure()
+ax = plt.gca()
+lines = tools.LD_plottable(mesh, sol_prev.vec)
+tools.plot_LD_groups(mesh, lines.intensity, [0])
+plt.autoscale()
+
+
+# plt.show()
+
+
+# plt.figure()
 
 change = T_prev.copy()
 b = tools.Transport_solution(mesh)
@@ -163,37 +170,92 @@ b = tools.Transport_solution(mesh)
 solutions = []
 solutions.append(copy.deepcopy(b))
 
-plt.plot(mesh.cell_centers, T_prev*physics.K, label=f"{0:.2e}")
+# plt.plot(mesh.cell_centers, T_prev*physics.K, label=f"{0:.2e}")
+# plt.title("Temperature, initial")
 
-for t in range(0, 10):
-    kappa = group_FC_opacity(mesh, T_prev, k_star)
+
+
+
+temp_vec = []
+
+sol_test = tools.Transport_solution(mesh)
+
+plt.figure()
+ax = plt.gca()
+lines = tools.LD_plottable(mesh, sol_prev.vec)
+tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
+plt.title("previous solution, kappa=1")
+plt.autoscale()
+
+
+kappa_test = 100*numpy.ones((mesh.nx))
+
+coeff = tools.MG_coefficients(mesh)
+coeff.assign(mesh, kappa_test, sol_prev, T_prev, Cv, Q)
+
+
+mat_test = method.global_mat_elementwise(mesh, kappa_test, 1/(3*kappa_test))
+src_test = method.get_HO_source(mesh, sol_prev.intensity, coeff, 0)
+
+sol_test.vec[:] = sparse.linalg.inv(mat_test) @ src_test
+
+plt.figure()
+ax = plt.gca()
+lines = tools.LD_plottable(mesh, sol_test.vec)
+tools.plot_LD_groups(mesh, lines.intensity, [0])
+plt.title("Test intensity, kappa=1")
+plt.autoscale()
+
+
+plt.figure()
+ax = plt.gca()
+lines = tools.LD_plottable(mesh, sol_test.vec)
+tools.plot_LD_groups(mesh, lines.flux, range(0, mesh.ng))
+plt.title("Test flux, kappa=1")
+plt.autoscale()
+
+
+
+plt.show()
+
+
+
+for t in range(0, 20):
+    # kappa[:] = group_FC_opacity(mesh, T_prev, k_star)
+    kappa[:] = numpy.tile(27/(mesh.groups[1:]*physics.H/1000)**3, reps = (mesh.nx, 1)).transpose()
     
 
     b.vec[:,:]  = method.unaccelerated_loop(mesh, sol_prev, T_prev, kappa, Cv, Q)
 
     solutions.append(copy.deepcopy(b))
 
-    sol_prev.vec[:] = b.vec[:]
+    sol_prev.vec[:] = b.vec[:].copy()
     coeff = tools.MG_coefficients(mesh)
     coeff.assign(mesh, kappa, b, T_prev, Cv, Q)
 
-    print(b.intensity[0])
-    print("cell edges")
+    print(coeff.kappa.shape)
+    print("kappa shape")
+    print(coeff.kappa[:, 0])
+    print("kappa")
 
-    print(b.cell_center_i[0])
-    print("center intensity input")
 
     change[:] = method.update_temperature(mesh, coeff, b, Cv)
-    print(change)
-    print("Change")
+    T_prev = T_prev + change[:].copy()
+    coeff.assign(mesh, kappa, b, T_prev, Cv, Q)
+    temp_vec.append(T_prev)
 
-    T_prev = T_prev + change[:]
+plt.figure()
+
+for t in range(0, len(temp_vec)):
+    plt.plot(mesh.cell_centers, temp_vec[t]*physics.K, label=f"{(t+1)*mesh.dt:.2e}")
+plt.legend()
+plt.title("Temperature, final")
 
     
 plt.figure()
 ax = plt.gca()
 lines = tools.LD_plottable(mesh, b.vec)
-tools.plot_LD_groups(mesh, lines.intensity, [0])
+tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
 plt.title("b, intensity")
 ax.autoscale()
 
@@ -221,20 +283,8 @@ ax.autoscale()
 
 plt.show()
 
+print(coeff.kappa[:])
+print("kappa")
 
-def planck(T, nu):
-    B = 8*numpy.pi*(H*nu)**3/((C**2 * H**2)*(numpy.exp((H*nu)/(K*T)) - 1))
-    return(B)
-
-c2 = tools.MG_coefficients(mesh)
-c2.assign(mesh, kappa, sol_prev, T_prev*1000, Cv, 0)
-
-# plt.figure()
-# plt.plot(H*nu, planck(T_prev[0]*1000, nu))
-# plt.stairs(c2.beta[:, 0]/numpy.diff(mesh.groups), edges = H*mesh.groups)
-# plt.xscale('log')
-# plt.yscale('log')
-# plt.ylim(1e-8, 1e20)
-# plt.show()
 
 
