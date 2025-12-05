@@ -10,31 +10,293 @@
 \usetheme{Madrid}
 \usecolortheme{beaver}
 
+\usepackage{amsmath}
+\newcommand{\norm}[1]{\left\| {#1} \right\|}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+
+\newcommand*\Let[2]{\State{#1 $\gets$ #2}}
+\algrenewcommand\algorithmicrequire{\textbf{Precondition:}}
+\algrenewcommand\algorithmicensure{\textbf{Postcondition:}}
+
 \begin{document}
 
 \frame{\titlepage}
 
 \begin{frame}
-    \frametitle{Table of Contents}
+    \frametitle{Outline}
     \tableofcontents
     
 \end{frame}
 
-\section{Introduction}
+\section{Radiative Diffusion Problem}
 
-% Motivation for Research
-% Significance and Novelty of research
+\begin{frame}
+    \frametitle{Radiative Diffusion Problem}
+    \small
 
-\section{Unaccelerated Radiative Diffusion}
+    Radiative Diffusion Equation:
 
-% Problem notation-- look to multilevel slides on Moodle
+    \begin{gather}
+        \label{eq:spectral_temperature}
+        \rho C_v \frac{\partial T}{\partial t} = \nabla \cdot K \nabla T - \nabla {\mathbb{P}u} + \rho \int_0^\infty \kappa(E^\prime)\left[ I(E^\prime) - \beta(E^\prime, T) \right] dE^\prime + Q\\
+        \label{eq:spectral_diffusion}
+        \frac{1}{c}\frac{\partial I}{\partial t} - \nabla \cdot D(\nu) \nabla I(\nu) + \rho \kappa(E)I(E) = \rho\kappa(\nu)\beta(\nu, T), 
+    \end{gather}
 
-% Diffusion Equations -- radiative and thermal
-    % original equation
-    % neutron-like version -- happens upon discretization
-% Define all variables here, describe physicality of sigmas
+    \begin{gather}
+        I(E) = \int_{4\pi} I(E, \Omega) d\Omega = cE\\
+        \kappa(E) = \frac{\varkappa(E)}{\rho }
+    \end{gather}
 
-\section{Acceleration Scheme}
+    \begin{equation}
+        \beta(\nu, T) = \int_{4\pi} B_\nu(T) = \frac{8\pi h \nu^3}{c^2}\frac{1}{e^{h\nu/kT} - 1}
+    \end{equation}
+
+    % Describe main problem here-- strong coupling between temperature and radiation intensity leads to very slow convergence of standard algorithms
+        
+\end{frame}
+
+\begin{frame}
+  \frametitle{Standard iterative form derivation}
+  \footnotesize
+    Backward Euler, lagged coefficients:
+
+    \begin{gather}
+    \rho C_v^n \frac{T^{n+1} - T^n}{\Delta t^n} = \nabla \cdot K^n \nabla T^{n+1} - \nabla {\mathbb{P}u} + \rho \sum_{g=1}^{N_g} \kappa_g^n \left[ I_g^{n+1} - \beta_g^{n+1}(T) \right] + Q^{n+1}\\
+    \frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \rho \kappa_k^n \beta_k(T(t)); \qquad k=1\dots N_g.
+\end{gather}
+
+Approximate using a first-order Taylor expansion, $\beta_k^{n+1} \approx \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}$, and apply operator splitting:
+
+\begin{gather}
+    \label{eq:MEB}\rho C_v^n \frac{\Delta T^{n+1/2}}{\Delta t^n} =  \rho \sum_{g=1}^{N_g} \kappa_g^n \left[ I_g^{n+1} - \left( \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}\right) \right] + Q^{n+1}\\
+    \label{eq:intermediate_intensity}\frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \rho \kappa_k^n \left( \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}\right); \qquad k=1\dots N_g\\
+    \rho C_v^n \frac{\Delta T^{n+1}}{\Delta t^n} = \nabla \cdot K^n \nabla T^{n+1} - \nabla \cdot {\mathbb{P}u}
+  \end{gather}
+
+
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Standard iterative form}
+  Solving for $Delta T^{n+1/2}$,
+
+\begin{equation}
+  \label{eq:intermediate_temperature}\Delta T^{n+1/2} = \left[    \sum_{g=1}^{N_g} \kappa_g^n \left( I_g^{n+1} -  \beta_k^n  \right) +  \frac{Q^{n+1}}{\rho}    \right] \cdot {\left[  \frac{ C_v^n}{\Delta t^n}  + \sum_{g=1}^{N_g}\kappa_g^n \frac{\partial \beta_g^n}{\partial T}\right]}^{-1}
+\end{equation}
+\end{frame}
+
+\begin{frame}
+
+\frametitle{Standard iterative form derivation}
+    Radiative diffusion with expanded $\Delta T^{n+1}$ becomes:\small
+
+\begin{gather}\label{eq:standard_diffusion}
+  \frac{1}{c \Delta t^n}\left( I^{n+1} - I^n \right)- \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \eta \chi_k  \sum_{g=1}^{N_g}\rho\kappa_g I_g^{n+1} + q_k
+\end{gather}
+
+where
+\begin{subequations}\label{eq:long-form}
+  \begin{align}
+    \eta   &=  \left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right] \cdot {\left[ \frac{C_v}{\Delta t^n} + \sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T} \right]}^{-1} \tag{re-emitted within time step} \\
+    \chi_k &=  \left[ \kappa_k  \frac{\partial \beta_k}{\partial T}   \right] \cdot {\left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right]}^{-1} \tag{re-emission spectrum}\\
+    q_k    &=  \rho \kappa_k \beta_k  +  \eta \chi_k \left[ Q -  \sum_{g=1}^{N_g}\rho\kappa_g\frac{\partial \beta_g}{\partial T} \right]\tag{local source}
+  \end{align}
+\end{subequations}\normalsize
+
+\end{frame}
+
+
+
+\begin{frame}
+
+  \frametitle{Standard iterative form derivation, compact form}
+  \small
+
+  Rewrite Eq.~\ref{eq:long-form} using neutron transport terms
+
+  \begin{subequations}
+    \begin{gather}
+  \label{eq:neutron_diffusion}-\nabla \cdot D_k \nabla I_k^{n+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{n+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^{n+1} + S_k\\
+  \Delta T^{n+1/2} = \left[ \sum_{g=1}^{N_g} \kappa_g^n \left( I_g^{n+1} -  \beta_k^n  \right) +  \frac{Q^{n+1}}{\rho}    \right] \cdot {\left[  \frac{ C_v^n}{\Delta t^n}  + \sum_{g=1}^{N_g}\kappa_g^n \frac{\partial \beta_g^n}{\partial T}\right]}^{-1}
+\end{gather}
+  \end{subequations}
+where
+
+\begin{subequations}\label{eq:neutron_xs}
+  \begin{align}
+  \sigma_a     &= \frac{1}{c\Delta t^n}\\
+  \sigma_{f, k} &= \rho \kappa_k\\
+  S_k &= q_k + \frac{I_k^n}{c\Delta t^n}
+\end{align}
+\end{subequations}
+
+  
+  
+\end{frame}
+\begin{frame}
+  \frametitle{Algorithm}
+
+  \footnotesize
+  % \caption{Radiative Diffusion Iteration}\label{alg:unaccelerated}
+  \begin{algorithmic}[0]
+    % \Require{$x$ and $y$ are packed dna strings of equal length $n$}
+    \Statex{}
+    \While{$t^j \leq t^{end}$}
+      \Let{$j$}{$j+1$}
+      \State{Compute (lagged) temperature-dependent coefficients using $T\vert_{t=t^{j-1}}$}
+      \While{$\norm{I^{(s)} - I^{(s-1)}} > \epsilon\norm{I^{(s-1)}}$}
+        \Let{$s$}{$s+1$}
+        \State{Solve multigroup neutron-like diffusion equation for $I_k^{(s+1/2)}$, using $\eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^{n+1}$ for the reemission source}
+      \EndWhile{}
+      \Let{$I_k^{j}$}{$I_k^{(s+1)}$}
+      \State{Recover $\Delta T^{j+1/2}$ from $I_k^{j}$}
+      \If{$K \neq 0 \land u \neq 0$}
+        \State{Solve thermal diffusion equation for $\Delta T^{j+1}$}
+      \EndIf{}
+      \Let{$T^{j+1}$}{$T^j + \Delta T^{j+1/2} + \Delta T^{j+1}$}
+    \EndWhile{}
+  \end{algorithmic}
+
+  \begin{block}{Standard iteration is slow}
+    $S_k$ and $\sigma_a$ are both small compared to $\sigma_{f, k}$
+\end{block}
+
+\end{frame}
+
+
+
+
+\section{Achievements of Study}
+
+\begin{frame}
+  \normalsize
+  \frametitle{Achievements of study}
+
+  \begin{itemize}
+    \item Scheme is Linear
+    \item Characterized well by Fourier Analysis (similar to nonlinear method which had not been characterized, at a similar computational cost)
+    \begin{itemize}
+      \item Multifrequency Grey Method: frequency spectra of each iterate is used to form a one-group LO equation
+    \end{itemize}
+    \item Reduced Fourier mode spectral radius from $\sim   1$ to $\sim 0.6$
+    \item Low computational cost per iteration
+
+  \end{itemize}
+
+  \begin{figure}
+    \includegraphics[width=0.5\textwidth]{infinite-time.png}
+  \end{figure}
+  
+\end{frame}
+
+
+\section{Problem \& Acceleration Algorithm}
+
+\begin{frame}
+  \frametitle{Fourier Analysis of Unaccelerated Scheme}
+
+  Using $I_k(x) = I_k e^{i \lambda x}$,
+
+  \begin{equation}
+    I_k^{l+1}\left[D_k\lambda^2 + \sigma_a + \sigma_{f, k}\right] = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k
+  \end{equation}
+
+
+which leads to
+
+
+\begin{equation}\label{eq:fourier-eigenvalue}
+  \omega(\lambda) = \eta \sum_{k=1}^{N_g} \frac{\sigma_{f, k} \chi_k }{\lambda^2 D_k+ \sigma_a + \sigma_{f, k}} \qquad \text{spr} = \omega(0) = \eta \sum_{k=1}^{N_g} \frac{\sigma_{f, k} \chi_k }{\sigma_a + \sigma_{f, k}}.
+\end{equation}
+
+Notably, $\lambda=0$ (the slowest-converging eigenvalue) corresponds with the \alert{equilibrium solution}, $\nabla D \nabla I = 0$
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Correction term at equilibrium}
+
+  Exact equation for error, $I_k = I^l_k + \epsilon^l_k$
+
+  \begin{equation}
+    \left(\sigma_a + \sigma_{f, k} \right)\epsilon_k^l = \eta\chi_k \sum_{g=1}^{N_G}\sigma_{f, g}\epsilon_g^l + \eta\chi_k \sum_{g=1}^{N_G}\sigma_{f, g}\left(I_g^l - I_g^{l-1} \right)
+  \end{equation}
+
+  Summing over all groups for $E = \sum_{k} \epsilon$ yields
+
+  \begin{equation}
+    \frac{\epsilon_k^l}{E^l} = \frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}
+  \end{equation}
+
+  \begin{block}{Spectrum of $\epsilon$}
+    This is the spectrum of $\epsilon_k^l$, not $I_k^l$ -- that approximation is used for the multifrequency grey approximation
+  \end{block}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{One-group equation}
+  \small
+  Equation for iterative error
+
+
+  \begin{equation}
+    \label{eq:error-diffusion-equation}-\nabla \cdot D_k\nabla \epsilon_k^{l} + \left(\sigma_a + \sigma_{f, k}\right)\epsilon_k^{l} = \eta \chi_k \sum_{g=1}^{N_g} \sigma_{f, g} \left[ \epsilon_g^{l} +I_g^{l} - I_g^{l-1} \right]
+  \end{equation}
+
+  plug in equilibrium spectrum, sum over all groups to get
+
+ 
+
+  \begin{equation}
+    -\nabla \cdot D_k\nabla E^l\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} + \left(\sigma_a + \sigma_{f, k}\right)E^l\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}} =\eta \chi_k r^l + \eta \chi_k \sum_{g=1}^{N_g} \sigma_{f, g} E^l\frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}
+  \end{equation}
+
+  \begin{equation*}\boxed{-\nabla \cdot \left[\langle D \rangle \nabla E^l     +  \langle D^\prime \rangle  E^l    \right]  + E^l \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] =  \eta  r^l}
+  \end{equation*}
+
+  where
+
+  \begin{equation}
+    \langle D^\prime \rangle = \sum_{k=1}^{N_g} D_k  \nabla   \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}.
+  \end{equation} 
+
+\end{frame}
+
+\begin{frame}
+The accelerated algorithm is:
+  \frametitle{Accelerated Algorithm}
+  \small
+  \begin{algorithmic}[0]
+    % \Require{$x$ and $y$ are packed dna strings of equal length $n$}
+    \Statex{}
+    \While{$t^j \leq t^{end}$}
+      \Let{$j$}{$j+1$}
+      \State{Compute temperature-dependent coefficients using $T\vert_{t=t^{j-1}}$}
+      \While{$\norm{I^{(s)} - I^{(s-1)}} > \epsilon\norm{I^{(s-1)}}$}
+        \Let{$s$}{$s+1$}
+        \State{Solve multigroup diffusion equation for $I_k^{(s+1/2)}$, using $I_k^{(s)}$ for the reemission source}
+        \State{Compute $r^{(s+1/2)}$}
+        \State{Solve one-group error diffusion equation for $E^{(s+1/2)}$}
+        \State{Compute $I_k^{(s+1)} = I_k^{(s+1/2)} + E^{(s+1/2)}\langle \sigma_t \rangle \chi_k / \sigma_{t, k}$}
+      \EndWhile{}
+      \Let{$I_k^{j}$}{$I_k^{(s+1)}$}
+      \State{Compute $\Delta T^{j+1/2}$ from $I_k^{j}$}
+      \Let{$T^{j+1}$}{$T^j + \Delta T^{j+1/2} + \Delta T^{j+1}$}
+    \EndWhile{}
+  \end{algorithmic}
+\end{frame}
+
+
+
+
+
 
 % Operator form
 % "low-order approximation on error"
@@ -42,7 +304,103 @@
 % Briefly derive Equation for spectral shape
 % Briefly derive equation for grey photon intensity
 
-\section{Numerical Results}
+\section{Numerical Results \cite{morel1985synthetic}}
+
+\begin{frame}
+  \frametitle{Results}
+
+  Fourier eigenvalues:
+  
+  \begin{gather}
+    \omega_u(\lambda) = \eta \sum_{k=1}^{N_g} \frac{\sigma_{f, k} \chi_k }{\lambda^2 D_k+ \sigma_a + \sigma_{f, k}}\\
+    \omega_a(\lambda) = \omega_u(\lambda) + \langle \sigma_f \rangle\frac{\omega_u(\lambda) - 1}{\langle D \rangle\lambda^2 + \sigma_a + (1 - \eta)\langle \sigma_f \rangle} 
+  \end{gather}
+
+  \begin{itemize}
+  \item $\omega_a$ is strictly $< \omega_u$
+  \item $\omega_a(0) = 0$
+  \item Spectral radius of the accelerated algorithm is always $<1$
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Numerical Results from~\cite{morel1985synthetic}}
+
+  Test problem:
+
+  \begin{itemize}
+    \item 200 $\mu$m iron slab with uniform heat generation source
+    \item 1eV initial temperature, $140$ eV equilibrium temperature
+    \item Finite differencing scheme (Fourier Analysis was performed)
+  \end{itemize}
+
+  \begin{figure}
+    \includegraphics[width=0.7\textwidth]{table.png}
+  \end{figure}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Numerical Results from~\cite{morel1985synthetic}}
+  Continuous equations, finite time-step and heat capacity
+    \begin{figure}
+    \includegraphics[width=0.7\textwidth]{finite.png}
+  \end{figure}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Numerical Results}
+  Discretized equations, infinite time-step and optically-thick cells (one-half period)
+\begin{figure}
+    \includegraphics[width=0.7\textwidth]{worst-case.png}
+  \end{figure}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Status of LD-FEM implementation}
+
+  \begin{itemize}
+    \item Test cases (using manufactured opacities, etc) demonstrate that interior cell behavior is likely correct
+    \item Boundary cells seem to be the issue-- reverse derivative, blowing up values
+    \item At large opacity, solutions blow up nonphysically
+    \item Temperature updates are good but oscillatory-- possibly expected
+  \end{itemize}
+  
+\end{frame}
+
+\begin{frame}
+  \frametitle{Sample of results}
+  \begin{figure}
+    \includegraphics[width=0.45\textwidth]{../kappa0.1_intensity.png}
+    \includegraphics[width=0.45\textwidth]{../kappa1.0_intensity.png}
+
+    \includegraphics[width=0.45\textwidth]{../kappa10.0_intensity.png}
+  \end{figure}
+\end{frame}
+
+% \begin{frame}
+%   \frametitle{Finite Differencing}
+%   The diffusion equation as a system of $F$ and $I$:
+
+%   \begin{subequations}\label{eq:p1-equations}
+%  \begin{align}
+%   \label{eq:zeroth-moment}\frac{d}{dx} F^{l+1}_i + \left( \sigma_a + \sigma_{f} \right)I^{l+1}_i &= \eta \chi \sum_{g=1}^{N_g}\sigma_{f, g}I_{i, g}^l + S_i\\
+%   \label{eq:first-moment}F_i + D_i \frac{d}{dx} I_i&= 0.
+% \end{align} 
+% \end{subequations}
+
+% where in each cell
+
+% \begin{gather}
+%   I_i(x) = I_{L, i} b_{L, i}(x) +  I_{R, i} b_{R, i}(x),\\
+%   b_{L, i}(x) = \frac{x_{i+1/2}-x}{\Delta x_i}, \qquad b_{R, i}(x) = \frac{x - x_{i-1/2}}{\Delta x_i}
+% \end{gather}
+
+      
+% \end{frame}
+
+
 
 % Fleck and Cummings test
 % Other optional tests if necessary

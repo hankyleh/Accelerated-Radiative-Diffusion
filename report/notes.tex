@@ -67,11 +67,11 @@ Discretizing in time with Backward Euler and using lagged opacity, thermal condu
 Then, the time advancement of $\beta$ can be approximated using a first-order Taylor expansion, $\beta_k^{n+1} \approx \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}$, and the temperature operator is split into two parts-- radiative/inhomogenous source and thermal conductivity/pressure. The linearized, time-discretized equations are:
 
 
-  \begin{gather}
+\begin{gather}
     \label{eq:MEB}\rho C_v^n \frac{\Delta T^{n+1/2}}{\Delta t^n} =  \rho \sum_{g=1}^{N_g} \kappa_g^n \left[ I_g^{n+1} - \left( \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}\right) \right] + Q^{n+1}\\
     \label{eq:intermediate_intensity}\frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \rho \kappa_k^n \left( \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}\right); \qquad k=1\dots N_g\\
     \rho C_v^n \frac{\Delta T^{n+1}}{\Delta t^n} = \nabla \cdot K^n \nabla T^{n+1} - \nabla \cdot {\mathbb{P}u}
-  \end{gather}
+\end{gather}
 
 
 
