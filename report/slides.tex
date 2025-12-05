@@ -15,17 +15,86 @@
 \frame{\titlepage}
 
 \begin{frame}
-    \frametitle{Table of Contents}
+    \frametitle{Outline}
     \tableofcontents
     
 \end{frame}
 
-\section{Introduction}
+\section{Radiative Diffusion Problem}
+
+\begin{frame}
+
+    Radiative Diffusion Equation:
+
+    \begin{gather}
+        \label{eq:spectral_temperature}
+        \rho C_v \frac{\partial T}{\partial t} = \nabla \cdot K \nabla T - \nabla {\mathbb{P}u} + \rho \int_0^\infty \kappa(E^\prime)\left[ I(E^\prime) - \beta(E^\prime, T) \right] dE^\prime + Q\\
+        \label{eq:spectral_diffusion}
+        \frac{1}{c}\frac{\partial I}{\partial t} - \nabla \cdot D(\nu) \nabla I(\nu) + \rho \kappa(E)I(E) = \rho\kappa(\nu)\beta(\nu, T), 
+    \end{gather}
+
+    \begin{gather}
+        I(E) = \int_{4\pi} I(E, \Omega) = cE\\
+        \rho \kappa(E) = \varkappa(E)
+    \end{gather}
+
+    \begin{equation}
+        \beta(\nu, T) = \int_{4\pi} B_\nu(T) = \frac{8\pi h \nu^3}{c^2}\frac{1}{e^{h\nu/kT} - 1}
+    \end{equation}
+
+    % Describe main problem here-- strong coupling between temperature and radiation intensity leads to very slow convergence of standard algorithms
+        
+\end{frame}
+
+\begin{frame}
+    Backward Euler, lagged coefficients:
+
+    \begin{gather}
+    \rho C_v^n \frac{T^{n+1} - T^n}{\Delta t^n} = \nabla \cdot K^n \nabla T^{n+1} - \nabla {\mathbb{P}u} + \rho \sum_{g=1}^{N_g} \kappa_g^n \left[ I_g^{n+1} - \beta_g^{n+1}(T) \right] + Q^{n+1}\\
+    \frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \rho \kappa_k^n \beta_k(T(t)); \qquad k=1\dots N_g.
+\end{gather}
+
+Approximate using a first-order Taylor expansion, $\beta_k^{n+1} \approx \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}$, and apply operator splitting:
+
+\begin{gather}
+    \label{eq:MEB}\rho C_v^n \frac{\Delta T^{n+1/2}}{\Delta t^n} =  \rho \sum_{g=1}^{N_g} \kappa_g^n \left[ I_g^{n+1} - \left( \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}\right) \right] + Q^{n+1}\\
+    \label{eq:intermediate_intensity}\frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \rho \kappa_k^n \left( \beta_k^n + \frac{\partial \beta_k^n}{\partial T}\Delta T^{n+1}\right); \qquad k=1\dots N_g\\
+    \rho C_v^n \frac{\Delta T^{n+1}}{\Delta t^n} = \nabla \cdot K^n \nabla T^{n+1} - \nabla \cdot {\mathbb{P}u}
+  \end{gather}
+
+Solving for $Delta T^{n+1/2}$,
+
+\begin{equation}
+  \label{eq:intermediate_temperature}\Delta T^{n+1/2} = \left[    \sum_{g=1}^{N_g} \kappa_g^n \left( I_g^{n+1} -  \beta_k^n  \right) +  \frac{Q^{n+1}}{\rho}    \right] \cdot {\left[  \frac{ C_v^n}{\Delta t^n}  + \sum_{g=1}^{N_g}\kappa_g^n \frac{\partial \beta_g^n}{\partial T}\right]}^{-1}
+\end{equation}
+\end{frame}
+
+\begin{frame}
+    Radiative diffusion with expanded $\Delta T^{n+1}$:
+
+    which reduces to the final form of the multigroup diffusion equation,
+
+\begin{equation}\label{eq:standard_diffusion}
+  \frac{1}{c \Delta t^n}\left( I^{n+1} - I^n \right)- \nabla \cdot D_k^n \nabla I_k^{n+1} + \rho \kappa_k^n I_k^{n+1} = \eta \chi_k \rho \sum_{g=1}^{N_g}\kappa_g I_g^{n+1} + q_k
+\end{equation}
+
+where
+\begin{subequations}
+  \begin{align}
+    \eta   &=  \left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right] \cdot {\left[ \frac{C_v}{\Delta t^n} + \sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T} \right]}^{-1} \\
+    \chi_k &=  \left[ \kappa_k  \frac{\partial \beta_k}{\partial T}   \right] \cdot {\left[\sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T}\right]}^{-1} \\
+    q_k    &=  \rho \kappa_k \beta_k  +  \eta \chi_k \left[ Q - \rho \sum_{g=1}^{N_g}\kappa_g\frac{\partial \beta_g}{\partial T} \right]
+  \end{align}
+\end{subequations}
+
+
+
+\end{frame}
 
 % Motivation for Research
 % Significance and Novelty of research
 
-\section{Unaccelerated Radiative Diffusion}
+\section{Achievements of Study}
 
 % Problem notation-- look to multilevel slides on Moodle
 
@@ -34,7 +103,7 @@
     % neutron-like version -- happens upon discretization
 % Define all variables here, describe physicality of sigmas
 
-\section{Acceleration Scheme}
+\section{Problem \& Acceleration Algorithm}
 
 % Operator form
 % "low-order approximation on error"
@@ -42,7 +111,7 @@
 % Briefly derive Equation for spectral shape
 % Briefly derive equation for grey photon intensity
 
-\section{Numerical Results}
+\section{Numerical Results \cite{morel1985synthetic}}
 
 % Fleck and Cummings test
 % Other optional tests if necessary

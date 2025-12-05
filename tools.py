@@ -5,6 +5,7 @@ from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 import physics
 from itertools import cycle
+import copy
 
 from physics import C, SIG_R, A_R, H
 
@@ -78,7 +79,7 @@ class Discretization:
     def __init__(self):
         self.groups = numpy.array([0.000, 1e10])*(1000/H)
         self.x_length = 4
-        self.t_stops = numpy.array([0, 1e-2, 2e-2])
+        self.t_stops = numpy.array([0, 1e-2, 2e-2]) * 1e-8
         self.dx = 0.4 # cm
         self.dt = 2e-3 # shakes
         self.I_BC = numpy.zeros((1, 2))
@@ -158,13 +159,13 @@ class MG_coefficients:
 
 
     def assign(self, mesh : Discretization, kappa, sol_prev : Transport_solution, T_prev, Cv, Q):
-        self.kappa[:,:] = kappa.copy()
-        I_prev = sol_prev.intensity.copy()
+        self.kappa[:,:] = copy.deepcopy(kappa)
+        I_prev = copy.deepcopy(sol_prev.intensity[:])
         self.db_dt[:,:] = physics.group_dB_dT(mesh, T_prev)
         self.beta[:,:] = physics.group_planck(mesh, T_prev)
 
         self.sig_a = 1/(mesh.C*mesh.dt)
-        self.sig_f[:,:] = kappa.copy()
+        self.sig_f[:,:] = copy.deepcopy(kappa)
 
         self.chi[:,:] = (kappa * self.db_dt) / numpy.tile(numpy.sum(kappa * self.db_dt, axis=0), reps = (mesh.ng, 1))
         self.eta[:] = (numpy.sum(kappa * self.db_dt, axis=0)
@@ -240,4 +241,27 @@ def plot_LD_groups(mesh : Discretization, lines: LineCollection, groups=[0]):
         legend_labels.append(f"g={g}")
     plt.legend(legend_proxies, legend_labels)
     return 0
-    
+
+class Grey_coeff:
+    def __init__(self, mesh : Discretization):
+        self.D_avg = numpy.zeros((mesh.nx))
+        self.siga_avg = numpy.zeros((mesh.nx))
+        self.sigf_avg = numpy.zeros((mesh.nx))
+        self.sigt_avg = numpy.zeros((mesh.nx))
+        self.r = numpy.zeros((2*mesh.nx))
+        self.eta = 1
+        self.sig_a = 1
+        self.spectrum = numpy.ones((mesh.ng, mesh.nx))/mesh.ng
+    def assign(self, 
+               mesh: Discretization, 
+               mg_coeff : MG_coefficients, 
+               this_soln : Transport_solution, 
+               prev_soln = Transport_solution):
+        sig_t = mg_coeff.sig_a + mg_coeff.sig_f
+        self.sig_a = copy.deepcopy(mg_coeff.sig_a)
+        self.sigt_avg[:] = 1/(numpy.sum(mg_coeff.chi / (sig_t), axis=0))
+        self.sigf_avg[:] = self.sigt_avg * numpy.sum(mg_coeff.chi * mg_coeff.sig_f / sig_t, axis=0)
+        self.D_avg[:] = self.sigt_avg * numpy.sum(mg_coeff.chi * mg_coeff.D / sig_t, axis=0)
+        self.r[:] = numpy.sum(dbl(mg_coeff.sig_f)*(this_soln.intensity[:] - prev_soln.intensity[:]))
+        self.eta = copy.deepcopy(mg_coeff.eta)
+        self.spectrum[:] = (self.sigt_avg[:] * mg_coeff.chi[:, :] / sig_t)
