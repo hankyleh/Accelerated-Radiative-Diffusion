@@ -5,6 +5,7 @@ import numpy
 import scipy.sparse as sparse
 import copy
 from matplotlib import pyplot as plt
+import math
 
 def global_mat_elementwise(mesh : tools.Discretization, sigma, D):
     nx = mesh.nx + 0
@@ -39,7 +40,7 @@ def global_mat_elementwise(mesh : tools.Discretization, sigma, D):
 
         # print(f"cell number {i}, right equations-- rows{right_row_z}, {right_row_f}")
 
-        # right equation
+        # b_R equation
             # Zeroth moment
         global_matrix[right_row_z, F_next_L] = 1/2
         global_matrix[right_row_z, F_cell_L] = -1/2
@@ -77,7 +78,7 @@ def global_mat_elementwise(mesh : tools.Discretization, sigma, D):
         left_row_f = left_row_z + half
         # right_row_f = right_row_z + half
 
-        # left equation
+        # b_L equation
 
         # Zeroth moment
         global_matrix[left_row_z, F_cell_R] = 1/2
@@ -96,7 +97,7 @@ def global_mat_elementwise(mesh : tools.Discretization, sigma, D):
         global_matrix[left_row_f, I_next_R] = -D[i]*1/2
 
 
-    # left boundary cell, left equation
+    # left boundary cell, b_L equation
     i = 0
     # I_next_R = 2*i - 1
     I_cell_L = 2*i
@@ -142,7 +143,7 @@ def global_mat_elementwise(mesh : tools.Discretization, sigma, D):
     # left_row_f = left_row_z + half
     right_row_f = right_row_z + half
 
-    # right equation
+    # b_R equation
     # Zeroth moment
     # global_matrix[right_row_z, F_next_L] = 1/2
     global_matrix[right_row_z, F_cell_L] = -1/2
@@ -243,6 +244,8 @@ def get_HO_source(
         k     : int):
     source = numpy.zeros((4*mesh.nx))
 
+    print(f"Assigning Source, k = {k}")
+
     # compute fission source, add to 'S'
     dx = mesh.dx
     nx = mesh.nx
@@ -254,26 +257,37 @@ def get_HO_source(
         mass_global[2*i : 2*i+2, 2*i : 2*i+2] += M[:]
     mass_global[:] = mass_global.tocsr()
 
+    # print(mass_global[0:6, 0:6])
+    # print("mass matrix sample")
+
+    # print(coeff.sig_f[:, 0:6])
+    # print("kappa sample")
+
     fiss = numpy.zeros((mesh.ng, 2*nx))
 
-
-   
     for g in range(0, mesh.ng):
         fiss[g] += tools.dbl(coeff.sig_f[g])*(prev_I[g])
+
+    # print(fiss[0:6, 0:6])
+    # print("Fission source sample")
 
         
     source[0:2*mesh.nx] += (dx*( mass_global @ coeff.S[k])
                 + (tools.dbl(coeff.eta) * tools.dbl(coeff.chi[k])
                 * dx* (mass_global @ numpy.sum(fiss, axis=0))))
+
+    # print(source[0:6])
+    # print("Source sample before BC")
     # add BCs
-    source[0] += mesh.F_BC[k, 0]
+    source[0]             += mesh.F_BC[k, 0]
     source[(2*mesh.nx)-1] += -mesh.F_BC[k, 1]
 
 
+    source[2*mesh.nx] += coeff.D[k, 0] * mesh.I_BC[k, 0]
+    source[-1] +=      - coeff.D[k, -1] * mesh.I_BC[k, 1]
 
-
-    source[2*mesh.nx] += mesh.I_BC[k, 0]
-    source[-1] +=        -mesh.I_BC[k, 1]
+    # print(source[0:6])
+    # print("BCs added")
 
 
     return source
@@ -312,20 +326,12 @@ def assemble_LO(mesh : tools.Discretization, coeff : tools.Grey_coeff):
 
 def unaccelerated_loop(mesh : tools.Discretization, 
                        sol_prev : tools.Transport_solution, 
-                       T_prev, 
-                       kappa, 
-                       Cv, 
-                       Q):
-    print(T_prev)
-    print("temperature")
+                       coeff : tools.MG_coefficients, 
+                       exact_inverse):
 
-    coeff = tools.MG_coefficients(mesh)
-    I_prev = sol_prev.intensity[:]
-    coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
 
-    last_iteration = tools.Transport_solution(mesh)
-    updated_solution =  tools.Transport_solution(mesh)
-    last_iteration.vec[:,:] = sol_prev.vec[:].copy()
+    last_iteration = copy.deepcopy(sol_prev)
+    updated_solution =  copy.deepcopy(sol_prev)
     
     change = [1]
     iter = 0
@@ -334,11 +340,25 @@ def unaccelerated_loop(mesh : tools.Discretization,
         iter += 1
         print(f"Iteration {iter}, change = {numpy.max(change)}")
 
-        for k in range(0, mesh.ng):
-            sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
-            updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], atol = mesh.eps)
+        if exact_inverse == False:
+            for k in range(0, mesh.ng):
+                sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
+                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], atol = mesh.eps)
 
-        last_iteration.vec[:] = copy.deepcopy(updated_solution.vec[:])
+        else:
+            print("Solving system using numpy inv()")
+            for k in range(0, mesh.ng):
+                # print(coeff.kappa[:, 0:6])
+                # print("kappa before assigning mat/src")
+                sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
+                print(sys.mat[0:6, 0:6])
+                print("Global matrix sample")
+                print(sys.src[0:6])
+                print("source vector sample")
+                updated_solution.vec[k, :] = numpy.matmul(numpy.linalg.inv(sys.mat.todense()), sys.src) 
+
+
+        last_iteration = copy.deepcopy(updated_solution)
         diff = abs((updated_solution.intensity / last_iteration.intensity)- 1) 
         
         change = numpy.linalg.norm(diff, 2, axis=1)
@@ -358,12 +378,10 @@ def accelerated_loop(mesh : tools.Discretization,
     I_prev = sol_prev.intensity[:]
     coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
 
-    last_iteration   = tools.Transport_solution(mesh)
-    updated_solution =  tools.Transport_solution(mesh)
-    error_soln = tools.Transport_solution(mesh)
+    last_iteration   = copy.deepcopy(sol_prev)
+    updated_solution =  copy.deepcopy(sol_prev)
+    error_soln = copy.deepcopy(sol_prev)
 
-
-    last_iteration.vec[:,:] = copy.deepcopy(sol_prev.vec)
 
     grey_constants = tools.Grey_coeff(mesh)
     
@@ -389,15 +407,6 @@ def accelerated_loop(mesh : tools.Discretization,
         # error_soln.vec[:] , b = sparse.linalg.lgmres(sys_grey.mat, sys_grey.src, atol=mesh.eps, rtol = mesh.eps)
         error_soln.vec[:] = sparse.linalg.inv(sys_grey.mat) @ sys_grey.src
 
-        # plt.figure()
-        # plt.matshow(sys_grey.mat.todense())
-        # plt.show()
-
-        print("error solution found, ")
-        print(error_soln.vec[:])
-
-        print("error energy spectrum")
-        print(grey_constants.spectrum[:,:])
 
         last_iteration.vec[:] = updated_solution.vec[:] + error_soln.vec[:]*numpy.tile(tools.dbl(grey_constants.spectrum), reps = (1, 2))
         diff = abs((updated_solution.intensity / last_iteration.intensity)- 1) 
@@ -413,25 +422,22 @@ def update_temperature(mesh : tools.Discretization,
                        Q = 0):
     # TODO
 
-    # print(soln.cell_center_i[0])
-    # print("intensity")
-    # print(coeff.beta[0])
-    # print("beta")
-    # print(coeff.kappa[0] * (soln.cell_center_i[0] - coeff.beta[0]))
-    # print("diff")
+    print(soln.cell_center_i[0:6, 0:6])
+    print("cell center i, sample")
+    print(coeff.beta[0:6, 0:6])
+    print("beta, sample")
+    print(coeff.kappa[0:6, 0:6])
+    print("kappa, sample")
+    print(coeff.db_dt[0:6, 0:6])
+    print("db_dt, sample")
 
-    # print((Cv/mesh.dt))
-    # print("Cv/dt")
-
-    # print(numpy.sum(coeff.kappa * coeff.db_dt, axis = 0))
-    # print("kappa * dbdt")
-    temp = (
+    temp_change = (
         numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0) + Q
     )/(
-        (Cv/mesh.dt) + numpy.sum(coeff.kappa * coeff.db_dt, axis = 0)
+        (Cv/mesh.dt) + numpy.sum(coeff.kappa * coeff.db_dt, axis=0)
     )
 
-    return temp
+    return temp_change
 
     # calculate planck function, dbdt, all necessary constants
 
@@ -440,7 +446,12 @@ def solve_unaccelerated(mesh : tools.Discretization,
                         IC : tools.Transport_solution, 
                         T_init, 
                         Cv, 
-                        Q=0):
+                        Q=0, 
+                        accelerated=False, 
+                        first_step_only=False,
+                        exact_inverse=False,
+                        manual_kappa = False,
+                        print_T_change = False):
     print("Beginning unaccelerated iteration")
 
     dt = mesh.dt
@@ -453,93 +464,64 @@ def solve_unaccelerated(mesh : tools.Discretization,
 
     transport_output = []
     temp_output = []
-    transport_iters = tools.Transport_solution(mesh)
-    sol_prev = tools.Transport_solution(mesh)
-
-    sol_prev.vec[:] = copy.deepcopy(IC.vec)
+    transport_iters = copy.deepcopy(IC)
+    sol_prev = copy.deepcopy(IC)
 
     T_iter = copy.deepcopy(T_init)
 
     kappa = numpy.zeros((mesh.ng, mesh.nx))
     change = numpy.zeros(mesh.nx)
 
-    for stop in range(0, len(nt)):
 
-        print(f"Starting steps towards {nt[stop]}")
+    if accelerated == False:
+        print("unaccelerated method")
+        for stop in range(0, (first_step_only == False)*len(nt) 
+                          + (first_step_only == True)):
 
+            print(f"Starting steps towards {mesh.t_stops[stop]}")
 
-        for step in range(0, nt[stop]):
+            for step in range(0, nt[stop]):
 
-            kappa[:] = opacity(mesh, T_iter, k_star)
+                if manual_kappa is False:
+                    kappa[:] = opacity(mesh, T_iter, k_star)
+                    print(kappa[:, 0:6])
+                    print("assigned kappa for this time step")
+                else:
+                    print("manually assigning opacity")
+                    kappa[:] = manual_kappa
 
-            transport_iters.vec[:,:]  = unaccelerated_loop(mesh, sol_prev, T_iter, kappa, Cv, Q)
-            sol_prev.vec[:] = transport_iters.vec[:].copy()
-            coeff = tools.MG_coefficients(mesh)
-            coeff.assign(mesh, kappa, transport_iters, T_iter, Cv, Q)
+                coeff = tools.MG_coefficients(mesh)
+                coeff.assign(mesh, kappa, sol_prev, T_iter, Cv, Q)
 
-            change[:] = update_temperature(mesh, coeff, transport_iters, Cv)
-            T_iter += copy.deepcopy(change[:])
-            coeff.assign(mesh, kappa, transport_iters, T_iter, Cv, Q)
-        transport_output.append(transport_iters)
-        temp_output.append(temp_output)
+                transport_iters.vec[:,:]  = unaccelerated_loop(mesh, sol_prev, coeff, exact_inverse)
+                sol_prev.vec[:] = transport_iters.vec[:].copy()
+
+                if (sum(math.isnan(transport_iters.cell_center_i[i, j]) for i in range (0, mesh.ng) for j in range(0, mesh.nx)) > 0):
+                    print(transport_iters.intensity)
+                    print("Cell-edge flux")
+                    print(transport_iters.vec[0:6, 0:6])
+                    print("Sample of 'vec'")
+                    print(transport_iters.cell_center_i)
+                    print("Cell-centered flux")
+                    raise ValueError("NaN intensity encountered")
+                    
+                change[:] = update_temperature(mesh, coeff, transport_iters, Cv)
+                if print_T_change == True:
+                    print(change)
+                    print("Temperature delta")
+                T_iter += copy.deepcopy(change[:])
+                coeff.assign(mesh, kappa, transport_iters, T_iter, Cv, Q)
+            transport_output.append(copy.deepcopy(transport_iters))
+            temp_output.append(copy.deepcopy(T_iter[:]))
+
+    else:
+        print("accelerated method")
+        # TODO, accelerated time stepping
+        pass
         
     return temp_output, transport_output
 
 
-def solve_accelerated(mesh : tools.Discretization, 
-                        scale : tools.Scales, opacity, 
-                        IC : tools.Transport_solution, 
-                        T_init, 
-                        Cv, 
-                        Q=0):
-    print("Beginning accelerated iteration")
 
-    dt = mesh.dt
-    nu = mesh.groups
-
-    nt = mesh.nt
-    k_star = 27
-
-    # gets intensity, flux, and temperature at each provided time stop 
-
-    transport_output = []
-    temp_output = []
-    transport_iters = tools.Transport_solution(mesh)
-    sol_prev = tools.Transport_solution(mesh)
-
-    sol_prev.vec[:] = copy.deepcopy(IC.vec)
-
-    T_iter = copy.deepcopy(T_init)
-
-    kappa = numpy.zeros((mesh.ng, mesh.nx))
-    change = numpy.zeros(mesh.nx)
-
-    # for stop in range(0, len(nt)):
-
-    #     print(f"Starting steps towards {nt[stop]}")
-
-
-    #     for step in range(0, nt[stop]):
-
-    #         kappa[:] = opacity(mesh, T_iter, k_star)
-
-    # ACCLERATED LOOP!!!!!!!
-
-    #         transport_iters.vec[:,:]  = accelerated_loop(mesh, sol_prev, T_iter, kappa, Cv, Q)
-    #         sol_prev.vec[:] = transport_iters.vec[:].copy()
-    #         coeff = tools.MG_coefficients(mesh)
-    #         coeff.assign(mesh, kappa, transport_iters, T_iter, Cv, Q)
-
-    #         change[:] = update_temperature(mesh, coeff, transport_iters, Cv)
-    #         T_iter += copy.deepcopy(change[:])
-    #         coeff.assign(mesh, kappa, transport_iters, T_iter, Cv, Q)
-    #     transport_output.append(transport_iters)
-    #     temp_output.append(temp_output)
-        
-    # return temp_output, transport_output
-
-
-
-    
         
     

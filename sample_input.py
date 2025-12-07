@@ -75,28 +75,25 @@ mesh.groups = numpy.array([0.0000001, 0.3, 0.6, 0.8, 1.2, 1.5, 1.8, 2.4,
                            2.7, 3, 4, 5, 7, 9, 11, 15, 20, 1e4])*(1000/physics.H)
 mesh.dx = 0.4
 
-mesh.t_stops = numpy.array([0, 2e-2, 5e-2]) * 1e-8
+
 
 mesh.I_BC = numpy.zeros((mesh.ng, 2))
 mesh.F_BC = numpy.zeros((mesh.ng, 2))
 
-# mesh.I_BC[:, 0] = 0.5*physics.group_planck(mesh, 1000/physics.K)[:, 0]
-# mesh.F_BC[:, 0] = 0.5*physics.group_planck(mesh, 1000/physics.K)[:, 0]
+
+mesh.t_stops = numpy.array([0, 2.5e-3, 5e-3, 1e-2, 2e-2, 5e-2]) * 1e-8
+mesh.dt = 2.5e-3 * 1e-8 # seconds
+
+
+mesh.eps = 1e-9
 
 
 
-mesh.dt = 2e-1 * 1e-8 # seconds
+# print(mesh.groups)
+# print("groups, hz")
 
-
-mesh.eps = 1e-15
-
-
-
-print(mesh.groups)
-print("groups, hz")
-
-print(mesh.groups * physics.H)
-print("groups, eV")
+# print(mesh.groups * physics.H)
+# print("groups, eV")
 
 
 
@@ -114,173 +111,82 @@ print("groups, eV")
 
 
 
-T_prev = (1/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
-T_bound = (1000/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
-kappa = group_FC_opacity(mesh, T_prev, k_star)
+T_prev  = (1/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
+T_bound = (5/physics.K).astype(numpy.float128)*numpy.ones((mesh.nx))
+kappa   = group_FC_opacity(mesh, T_prev, k_star)
+
+print(kappa[0:6, 0:6])
+print("IC kappa")
 
 
-Cv    = FC_heatcap(1/physics.K, mesh)
+Cv    = FC_heatcap(100/physics.K, mesh)
 
 
 print(Cv)
 print("Cv")
-print("NTOE Cv has been modified-- check back later")
+print("NOTE Cv has been modified-- check back later")
 
 Q     = numpy.zeros((mesh.ng, mesh.nx))
 
 mesh.I_BC[:, 0] = (physics.group_planck(mesh, T_bound))[:, 0]
 mesh.F_BC[:, 0] = 0.5*(physics.group_planck(mesh, T_bound))[:, 0]
 
-print(mesh.I_BC[:, 0])
-print("bound")
-
-# print(physics.group_planck(mesh, T_prev))
-
-kappa = group_FC_opacity(mesh, T_prev, k_star)
-coeff = tools.MG_coefficients(mesh)
 
 
-sol_prev = tools.Transport_solution(mesh)
+
+
+sol_prev = tools.Transport_solution(mesh.nx, mesh.ng, numpy.zeros((mesh.ng, 4*mesh.nx)))
 sol_prev.intensity[:,:] = tools.dbl(physics.group_planck(mesh, T_prev))
-print(sol_prev.intensity[:,0:6])
-
-coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
-
-# print(kappa[:,0])
-# print("kappa original")
-# print(coeff.kappa[:,0])
-# print("coeff kappa")
-# print(coeff.D[:, 0])
-# print("D, coeff")
-
-
-plt.figure()
-ax = plt.gca()
-lines = tools.LD_plottable(mesh, sol_prev.vec)
-tools.plot_LD_groups(mesh, lines.intensity, [0])
-plt.autoscale()
-
-
-# plt.show()
-
-
-# plt.figure()
-
-change = T_prev.copy()
-b = tools.Transport_solution(mesh)
-
-solutions = []
-solutions.append(copy.deepcopy(b))
-
-# plt.plot(mesh.cell_centers, T_prev*physics.K, label=f"{0:.2e}")
-# plt.title("Temperature, initial")
 
 
 
-
-temp_vec = []
-
-sol_test = tools.Transport_solution(mesh)
-
-plt.figure()
-ax = plt.gca()
-lines = tools.LD_plottable(mesh, sol_prev.vec)
-tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
-plt.title("previous solution, kappa=1")
-plt.autoscale()
+kappa_test = 1*numpy.ones((mesh.ng, mesh.nx))
 
 
-kappa_test = 1000*numpy.ones((mesh.nx))
+T_out, I_out = method.solve_unaccelerated(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, exact_inverse=True, print_T_change=True)
 
-coeff = tools.MG_coefficients(mesh)
-coeff.assign(mesh, kappa_test, sol_prev, T_prev, Cv, Q)
+print(len(I_out))
+print("I out len")
 
+print(len(T_out))
+print("T out len")
 
-mat_test = method.global_mat_elementwise(mesh, kappa_test, 1/(3*kappa_test))
-src_test = method.get_HO_source(mesh, sol_prev.intensity, coeff, 0)
+print(I_out[1].intensity[0:6, 0:6] - I_out[0].intensity[0:6, 0:6])
+print("intensity diff")
 
-sol_test.vec[:] = sparse.linalg.inv(mat_test) @ src_test
-
-mat_test = method.global_mat_elementwise(mesh, kappa_test, 1/(3*kappa_test))
-src_test = method.get_HO_source(mesh, sol_prev.intensity, coeff, 0)
-
-sol_test.vec[:] = sparse.linalg.inv(mat_test) @ src_test
-
-plt.figure()
-ax = plt.gca()
-lines = tools.LD_plottable(mesh, sol_test.vec)
-tools.plot_LD_groups(mesh, lines.intensity, [0])
-plt.title(f"Test intensity, kappa={kappa_test[0]} cm-1")
-plt.autoscale()
-plt.savefig(f"kappa{kappa_test[0]}_intensity.png")
-plt.close()
-
-plt.figure()
-ax = plt.gca()
-lines = tools.LD_plottable(mesh, sol_test.vec)
-tools.plot_LD_groups(mesh, lines.flux, range(0, mesh.ng))
-plt.title(f"Test flux, kappa={kappa_test[0]} cm-1")
-plt.autoscale()
-plt.savefig(f"kappa{kappa_test[0]}_flux.png")
-plt.close()
-
-
-# plt.show()
-
-
-
-
-# a = method.unaccelerated_loop(mesh, sol_test, T_prev, kappa, Cv, Q)
-
-# plt.figure()
-# plt.show()
-
-
-
-
-# plt.figure()
-
-# for t in range(0, len(temp_vec)):
-#     plt.plot(mesh.cell_centers, temp_output[-1]*physics.K, label=f"{(t+1)*mesh.dt:.2e}")
-# plt.legend()
-# plt.title("Temperature, final")
-
-    
-# plt.figure()
-# ax = plt.gca()
-# lines = tools.LD_plottable(mesh, transport_output[-1].vec)
-# tools.plot_LD_groups(mesh, lines.intensity, range(0, mesh.ng))
-# plt.title("b, intensity")
-# ax.autoscale()
-
-
+print(T_out[1][0:6] - T_out[1][0:6])
+print("temp diff")
 
 # plt.figure()
 # ax = plt.gca()
-# lines = tools.LD_plottable(mesh, b.vec)
-# tools.plot_LD_groups(mesh, lines.flux, range(0, mesh.ng))
-# plt.title("b, flux")
-# ax.autoscale()
-
-# plt.show()
-
+# for i in range(0, len(I_out)):
+#     lines = tools.LD_plottable(mesh, I_out[i].vec)
+#     tools.plot_LD_groups(ax, mesh, lines.intensity, [0])
+# plt.title(f"Test intensity, kappa={kappa_test[0, 0]} cm-1")
+# plt.autoscale()
+# plt.savefig(f"kappa{kappa_test[0, 0]}_intensity.png")
+# # plt.close()
 
 # plt.figure()
 # ax = plt.gca()
+# lines = tools.LD_plottable(mesh, I_out[-1].vec)
+# tools.plot_LD_groups(ax, mesh, lines.flux, range(0, mesh.ng))
+# plt.title(f"Test flux, kappa={kappa_test[0, 0]} cm-1")
+# plt.autoscale()
+# plt.savefig(f"kappa{kappa_test[0, 0]}_flux.png")
+# # plt.close()
 
-# for i in range(0, len(solutions)):
-#     lines = tools.LD_plottable(mesh, solutions[i].vec)
-#     tools.plot_LD_groups(mesh, lines.intensity, [0])
-# plt.title("intensity over time")
-# ax.autoscale()
+plt.figure()
+for i in range(0, len(T_out)):
+    plt.plot(mesh.cell_centers, T_out[i], label = f"t={mesh.t_stops[i+1]:.1e} s")
+plt.legend()
+plt.xlabel("X [cm]")
+plt.ylabel("T [K]")
+plt.title("Temperature over time")
 
 
 
 
-# plt.show()
-
-# print(coeff.kappa[:])
-# print("kappa")
-
+plt.show()
 
 

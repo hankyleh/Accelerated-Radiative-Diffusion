@@ -10,6 +10,11 @@ import copy
 from physics import C, SIG_R, A_R, H
 
 
+UNACC = False
+ACC = True
+ONEITER = 1
+
+
 b_0i = numpy.array([[-0.25, 0.25, 0,     0   ],
                     [0,     0,    0.25, -0.25]])
     
@@ -41,10 +46,10 @@ def dbl(array):
     # doubles a constant, to reshape for L and R
 
 class Transport_solution:
-    def __init__(self, mesh):
-        self.vec = numpy.zeros((mesh.ng, 4*mesh.nx))
-        self._nx =  numpy.copy(mesh.nx)
-        self._ng = numpy.copy(mesh.ng)
+    def __init__(self, nx, ng, vec):
+        self.vec = vec
+        self._nx = nx
+        self._ng = ng
 
     
     @property
@@ -66,6 +71,13 @@ class Transport_solution:
     @property
     def cell_center_i(self):
         return 0.5 * (self.intensity[:, 1::2] + self.intensity[:, 0::2])
+    
+    def __deepcopy__(self, memo):
+        # Create a new instance and deep copy attributes
+        new_instance = Transport_solution(copy.deepcopy(self._nx, memo), 
+                                          copy.deepcopy(self._ng, memo),
+                                          copy.deepcopy(self.vec, memo))
+        return new_instance
     
         
 
@@ -227,7 +239,7 @@ class LD_plottable:
         self.grey_intensity = LineCollection(grey_segments_I)
         self.grey_flux = LineCollection(grey_segments_F)
 
-def plot_LD_groups(mesh : Discretization, lines: LineCollection, groups=[0]):
+def plot_LD_groups(a, mesh : Discretization, lines: LineCollection, groups=[0]):
     legend_proxies = []
     legend_labels = []
 
@@ -235,7 +247,7 @@ def plot_LD_groups(mesh : Discretization, lines: LineCollection, groups=[0]):
         c = lines[g]
         col = next(colors)
         c.set_color(col)
-        plt.gca().add_collection(c)
+        a.add_collection(c)
 
         legend_proxies.append(Line2D([0],[0], color=col, linestyle = "-"))
         legend_labels.append(f"g={g}")
