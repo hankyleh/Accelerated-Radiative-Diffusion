@@ -179,7 +179,7 @@ def unaccelerated_loop(mesh : tools.Discretization,
             print_update()
     # prints again when converged
     print_update()
-    return updated_solution.vec
+    return updated_solution.vec, iter
 
 
 def accelerated_loop(mesh : tools.Discretization, 
@@ -248,7 +248,7 @@ def accelerated_loop(mesh : tools.Discretization,
             print_update()
     # prints again when converged
     print_update()
-    return updated_solution.vec
+    return updated_solution.vec, iter
 
 
 def update_temperature(mesh : tools.Discretization, 
@@ -298,7 +298,7 @@ def solve_diffusion(mesh : tools.Discretization,
 
     transport_output = []
     temp_output = []
-    iters_log = []
+    iters_log = numpy.zeros((2, numpy.sum(mesh.nt))).astype(int)
     transport_iters = copy.deepcopy(IC)
     sol_prev = copy.deepcopy(IC)
 
@@ -329,9 +329,9 @@ def solve_diffusion(mesh : tools.Discretization,
             coeff.assign(mesh, kappa, sol_prev, T_iter, Cv, Q)
 
             if accelerated == True:
-                transport_iters.vec[:,:]  = accelerated_loop(mesh, sol_prev, coeff, flags)
+                transport_iters.vec[:,:], inners  = accelerated_loop(mesh, sol_prev, coeff, flags)
             else:
-                transport_iters.vec[:,:]  = unaccelerated_loop(mesh, sol_prev, coeff, flags)
+                transport_iters.vec[:,:], inners  = unaccelerated_loop(mesh, sol_prev, coeff, flags)
             sol_prev.vec[:] = transport_iters.vec[:].copy()
 
             if (sum(math.isnan(transport_iters.cell_center_i[i, j]) for i in range (0, mesh.ng) for j in range(0, mesh.nx)) > 0):
@@ -344,6 +344,14 @@ def solve_diffusion(mesh : tools.Discretization,
                 print(kappa[:, 0:6])
                 print("opacity sample")
                 raise ValueError("NaN intensity encountered")
+            
+            if accelerated == True:
+                iters_log[:,step + numpy.sum(mesh.nt[0:stop])] = inners * numpy.array([1, mesh.ng + 1]).transpose()
+            else:
+                iters_log[:,step + numpy.sum(mesh.nt[0:stop])] = inners * numpy.array([1, mesh.ng]).transpose()
+
+            # print("")
+            # print(iters_log)
                 
             change[:] = update_temperature(mesh, coeff, transport_iters, Cv)
             if print_T_change == True:

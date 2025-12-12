@@ -7,6 +7,8 @@ C = numpy.float128(2.99792458e+10)   # cm / s
 SIG_R = numpy.float128(3.53916934e+7) # eV / (cm^2 * s * K^4)
 A_R = numpy.float128(4.72215928e-3)  # eV / (cm^3  * K^4)
 
+ev_to_erg = (6.24150934e11)**-1
+
 pi = numpy.pi
 
 
@@ -32,12 +34,6 @@ def group_planck(mesh, T):
     else:
         t = numpy.tile(T, (mesh.ng+1, mesh.nx))
     g = numpy.tile(groups, (1, mesh.nx))
-
-    # print(numpy.diff(cumulative_sigma(mesh, t, g), axis=0) * (2*pi*(K)**4)/(H**3*C**2))
-    # print("sigma")
-    # print(numpy.sum(numpy.diff(cumulative_sigma(mesh, t, g), axis=0), axis=0)* (2*pi*(K)**4)/(H**3*C**2))
-    # print("sum sigma")
-    
     return (4*pi)*(1/pi) *numpy.diff(cumulative_sigma(mesh, t, g), axis=0) * t[1:]**4 * ((2*pi*(K)**4)/(H**3*C**2))
 
 def cumulative_dsigma_dT(mesh, T, nu):

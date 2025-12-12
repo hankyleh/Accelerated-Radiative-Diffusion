@@ -221,6 +221,12 @@ def plot_LD_groups(a, mesh : Discretization, lines: LineCollection, groups=[0]):
     plt.legend(legend_proxies, legend_labels)
     return 0
 
+def plot_LD_grey(a,  lines: LineCollection):
+    c = lines
+    col = next(colors)
+    c.set_color(col)
+    a.add_collection(c)
+
 class Grey_coeff:
     def __init__(self, mesh : Discretization):
         self.D_avg = numpy.zeros((mesh.nx))

@@ -72,12 +72,11 @@ mesh.I_BC = numpy.zeros((mesh.ng, 2))
 mesh.F_BC = numpy.zeros((mesh.ng, 2))
 
 
-mesh.t_stops = numpy.array([0, 2e-3, 2e-2]) * 1e-8
+mesh.t_stops = numpy.array([0, 2e-3, 2e-2, 5e-2, 1e-1, 2e-2, 3e-1]) * 1e-8
 mesh.dt = 2e-3 * 1e-8 # seconds
 
 
 mesh.eps = 1e-4
-
 
 
 
@@ -86,7 +85,7 @@ mesh.eps = 1e-4
 
 
 
-T_prev  = (400/mesh.K)*numpy.ones((mesh.nx))
+T_prev  = (1/mesh.K)*numpy.ones((mesh.nx))
 T_bound = (1000/mesh.K)*numpy.ones((mesh.nx))
 kappa   = group_FC_opacity(mesh, T_prev, k_star)
 
@@ -109,39 +108,86 @@ sol_prev.intensity[:,:] = tools.dbl(physics.group_planck(mesh, T_prev))
 
 
 
-T_out, I_out, _ = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=True)
+T_out, I_out, unacc_iters = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=False)
+T_out, I_out, acc_iters = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=True)
 
+time_vales_ct = mesh.t_stops[1:]*mesh.C
+time_labels = []
 
+for t in time_vales_ct:
+    time_labels.append(f"ct={t:.2f} cm")
+
+FC_x = [0.2,0.6,1,1.4,1.8,2.2,2.6,3,3.4,3.8]
+FC_T = 1000*numpy.array([[0.795,0.64,0.425,0.23,0.15,0.09,0.06,0.04,0.03,0.02],
+        [0.87,0.85,0.78,0.685,0.585,0.495,0.35,0.27,0.21,0.16],
+        [0.93,0.945,0.92,0.89,0.89,0.87,0.82,0.78,0.715,0.605]])
 
 plt.figure()
 ax = plt.gca()
 for i in range(0, len(I_out)):
-    lines = tools.LD_plottable(mesh, I_out[i].vec)
-    tools.plot_LD_groups(ax, mesh, lines.intensity, [0])
-plt.title(f"Intensity over time")
+    lines = tools.LD_plottable(mesh, physics.ev_to_erg*I_out[i].vec)
+    tools.plot_LD_grey(ax, lines.grey_intensity)
+plt.title(f"Grey intensity over time")
+plt.xlabel("x [cm]")
+plt.legend(time_labels)
 plt.autoscale()
 
 plt.figure()
 ax = plt.gca()
-
-lines = tools.LD_plottable(mesh, I_out[-1].vec)
-tools.plot_LD_groups(ax, mesh, lines.intensity, range(0, mesh.ng))
-plt.title(f"Final groups intensity")
+for i in range(0, len(I_out)):
+    lines = tools.LD_plottable(mesh, (1/mesh.C)*physics.ev_to_erg*I_out[i].vec)
+    tools.plot_LD_grey(ax, lines.grey_intensity)
+plt.title(f"Energy density over time")
+plt.xlabel("x [cm]")
+plt.legend(time_labels)
 plt.autoscale()
 
-# plt.figure()
-# ax = plt.gca()
-# lines = tools.LD_plottable(mesh, I_out[-1].vec)
-# tools.plot_LD_groups(ax, mesh, lines.flux, range(0, mesh.ng))
-# plt.autoscale()
-# # plt.close()
+
 
 plt.figure()
 for i in range(0, len(T_out)):
     plt.plot(mesh.cell_centers, mesh.K*T_out[i], label = f"t={mesh.t_stops[i+1]:.1e} s")
+for t in range(0, FC_T.shape[0]):
+    plt.scatter(FC_x, FC_T[t])
 plt.legend()
-plt.xlabel("X [cm]")
+plt.xlabel("x [cm]")
 plt.ylabel("T [eV]")
 plt.title("Temperature over time")
+
+
+s = numpy.sum(mesh.nt)
+plt.figure()
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[1], label="Unaccelerated")
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[1], label="Accelerated")
+plt.xlabel("ct [cm]")
+plt.ylabel("count")
+plt.title("Inner Iterations")
+plt.legend()
+
+plt.figure()
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[0], label="Unaccelerated")
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[0], label="Accelerated")
+plt.xlabel("ct [cm]")
+plt.ylabel("count")
+plt.title("Outer Iterations")
+plt.legend()
+
+plt.figure()
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[0], label="Outer Iterations")
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[1], label="Inner Iterations")
+plt.xlabel("ct [cm]")
+plt.ylabel("count")
+plt.title("Uanccelerated Solve")
+plt.legend()
+lim = plt.gca().get_ylim()
+
+plt.figure()
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[0], label="Outer Iterations")
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[1], label="Inner Iterations")
+plt.xlabel("ct [cm]")
+plt.ylabel("count")
+plt.title("Accelerated Solve")
+plt.legend()
+plt.ylim(lim)
 
 plt.show()
