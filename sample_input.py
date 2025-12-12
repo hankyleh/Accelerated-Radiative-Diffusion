@@ -72,8 +72,8 @@ mesh.I_BC = numpy.zeros((mesh.ng, 2))
 mesh.F_BC = numpy.zeros((mesh.ng, 2))
 
 
-mesh.t_stops = numpy.array([0, 2e-3, 2e-2, 5e-2, 1e-1, 2e-2, 3e-1]) * 1e-8
-mesh.dt = 2e-3 * 1e-8 # seconds
+mesh.t_stops = numpy.array([0, 2e-3]) * 1e-8
+mesh.dt = 5e-6 * 1e-8 # seconds
 
 
 mesh.eps = 1e-4

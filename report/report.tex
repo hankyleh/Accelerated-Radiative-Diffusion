@@ -1,8 +1,10 @@
 \documentclass{template}
-\title{Synthetic Acceleration for Radiative Diffusion Calculations}
+\title{Accelerated Radiative Diffusion Problems\\
+\normalsize Original article: Synthetic Acceleration for Radiative Diffusion Calculations~\cite{morel1985synthetic}}
 
 \author{Kyle Hansen}
-\date{NE 795 Computational Project\\5 December 2025}
+\date{NE 795 Computational Project\\
+12 December 2025}
 
 \usepackage{cancel}
 
@@ -23,14 +25,241 @@
 
 \maketitle
 
-\section{Introduction}
+\section{Problem}
 
-\subsection{Paper summary and significance}
+The equations for radiative diffusion are 
+
+\begin{subequations}\label{eq:radiative-diffusion}
+    \begin{gather}
+    \label{eq:spectral_diffusion}
+  \frac{1}{c}\frac{\partial I}{\partial t} - \nabla \cdot D(\nu) \nabla I(\nu) + \rho \kappa(E)I(E) = \rho\kappa(\nu)\beta(\nu, T)\\
+  \label{eq:spectral_temperature}
+  \rho C_v \frac{\partial T}{\partial t} = \nabla \cdot K \nabla T - \nabla {\mathbb{P}u} + \rho \int_0^\infty \kappa(E^\prime)\left[ I(E^\prime) - \beta(E^\prime, T) \right] dE^\prime + Q,
+\end{gather}
+\end{subequations}
+
+
+where \autoref{eq:spectral_diffusion} is the radiative diffusion equation, where $c$ is the speed of light, $I$ is scalar intensity $I_{\nu}(x) = \int_{4\pi} I_\nu(x,\Omega) d\Omega = cE$, $D$ is the radiative diffusion constant $(3\rho\kappa)^{-1}$, $\kappa$ is specific opacity $[\text{cm}^2/\text{g}]$, and $\beta$ is the angle-integrated Planck function, $\beta_\nu(T) = \int_{4\pi} B_\nu(T)d\Omega$.
+
+\autoref{eq:spectral_temperature} is the heat diffusion equation with radiation and hydrodynamic effects, where $\rho$ is material density, $C_v$ is material heat capacity, $K$ is thermal conductivity, $\mathbb{P}$ is the fluid pressure tensor, $u$ is fluid velocity, and $Q$ is heat generation per unit mass.
+
+The energy domain can be discretized using $N_g$ energy groups $G_i = [\nu_{i}, \nu_{i+1}]$ such that $\nu_0 = 0$ and $\nu_{N_g + 1} = \infty$. Using this discretization, and using $\varkappa = \rho\kappa$, the diffusion equations become
+
+\begin{subequations}
+    \begin{gather}
+  \frac{1}{c}\frac{\partial I_k}{\partial t} - \nabla \cdot D_k \nabla I_k + \varkappa_k I_k = \varkappa_k \beta_k(T)\\
+  \rho C_v \frac{\partial T}{\partial t} = \nabla \cdot K \nabla T - \nabla {\mathbb{P}u} +  \sum_{g=1}^{N_g} \varkappa_g\left[ I_g - \beta_g(T) \right]^\prime + Q,
+\end{gather}
+\end{subequations}
+
+where
+
+\begin{subequations}
+    \begin{align}
+    I_k &= \int_{G_k} I(\nu) d\nu\\
+    \beta_k &= \int_{G_k} \beta(\nu, T) d\nu\\
+    D_k\nabla I_k &= \int_{G_k}D(\nu)\nabla I(\nu)d \nu\\
+    \varkappa_k &= \frac{\int_{G_k} \left[\beta(\nu) - I(\nu) \right]   \varkappa(\nu) d\nu}{\int_{G_k} \left[\beta(\nu) - I(\nu) \right] d\nu}.
+\end{align}
+\end{subequations}
+
+Discretizing in time using Backward Euler (time index $n$), with lagged coefficients, \autoref{eq:radiative-diffusion} becomes:
+
+\begin{subequations}
+    \begin{gather}
+    \frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \varkappa_k^n I_k^{n+1} = \varkappa_k^n \beta_k\left(T^{n+1}\right); \qquad k=1\dots N_g\\
+    \rho C_v^n \frac{T^{n+1} - T^n}{\Delta t^n} = \nabla \cdot K^n \nabla T^{n+1} - \nabla {\mathbb{P}u} +  \sum_{g=1}^{N_g} \varkappa_g^n \left[ I_g^{n+1} - \beta_g(T^{n+1}) \right] + Q^{n+1}.
+\end{gather}
+\end{subequations}
+
+
+The time-advanced Planck function $\beta$ is approximated using the first-order Taylor expansion $\beta(T^{n+1}) \approx \beta(T^n) + \frac{\partial \beta}{\partial T} (T^{n+1} - T^n)$, which leads to the system for $T^{n+1}$ and $I^{n+1}$,
+
+\begin{subequations}
+   \begin{gather}
+    \frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \varkappa_k^n I_k^{n+1} = \varkappa_k^n  \left(\beta(T^n) + \frac{\partial\beta}{\partial T} \Delta T^{n+1} \right)    ; \qquad k=1\dots N_g\\
+    \rho C_v^n \frac{\Delta T^{n+1}}{\Delta t^n} = \nabla \cdot K^n \nabla T^{n+1} - \nabla {\mathbb{P}u} +  \sum_{g=1}^{N_g} \varkappa_g^n \left[ I_g^{n+1} - \beta(T^n) - \frac{\partial\beta}{\partial T} \Delta T^{n+1} \right] + Q^{n+1}.
+\end{gather}
+\end{subequations}
+
+Finally, the temperature operator is split into the hydrodynamic and radiative contributions,
+
+\begin{subequations}
+    \begin{gather}
+       \label{eq:rad-temperature}\rho C_v^n \frac{\Delta T^{n+1}}{\Delta t^n}  = \nabla \cdot K^n \nabla T^{n+1} - \nabla {\mathbb{P}u} +  Q^{n+1}\\
+    \label{eq:needs-dt}\frac{1}{c}\frac{I^{n+1} - I^n}{\Delta t^n} - \nabla \cdot D_k^n \nabla I_k^{n+1} + \varkappa_k^n I_k^{n+1} = \varkappa_k^n  \left(\beta(T^n) + \frac{\partial\beta}{\partial T} \Delta T^{n+1} \right)    ; \qquad k=1\dots N_g\\
+    \rho C_v^n \frac{\Delta T^{n+1/2}}{\Delta t^n} =   \sum_{g=1}^{N_g} \varkappa_g^n \left[ I_g^{n+1} - \beta(T^n) - \frac{\partial\beta}{\partial T} \Delta T^{n+1/2} \right],
+\end{gather}
+\end{subequations}
+
+where $T^{n+1} = T^n + \Delta T^{n+1/2} + \Delta T^{n+1}$. The indices $n+1/2$ and $n+1$ in this case refer to two separate contributions in the same time step, not temperature change at an intermediate time step.
+
+\autoref{eq:rad-temperature} can be immediately solved for temperature change,
+
+\begin{equation}\label{eq:temperature-change}
+    \Delta T^{n+1/2} = \frac{\sum_{g=1}^{N_g} \varkappa_g \left[ I_g^{n+1} - \beta_g^n \right] + Q}{\frac{\rho C_v^n}{\delta t^n} + \sum_{g=1}^{N_g} \varkappa_g \frac{\partial \beta}{\partial T}},
+\end{equation}
+
+which is then substituted into \autoref{eq:needs-dt} to give the radiative diffusion with implicit $\Delta T$:
+\begin{subequations}
+\begin{equation}\label{eq:standard_diffusion}
+  \frac{1}{c \Delta t^n}\left( I^{n+1} - I^n \right)- \nabla \cdot D_k^n \nabla I_k^{n+1} + \varkappa_k^n I_k^{n+1} = \eta \chi_k  \sum_{g=1}^{N_g}\varkappa_g I_g^{n+1} + q_k
+\end{equation}
+
+where
+  \begin{align}
+    \eta   &=  \left[\sum_{g=1}^{N_g}\varkappa_g\frac{\partial \beta_g}{\partial T}\right] \cdot {\left[ \frac{\rho C_v}{\Delta t^n} + \sum_{g=1}^{N_g}\varkappa_g\frac{\partial \beta_g}{\partial T} \right]}^{-1} \\
+    \chi_k &=  \left[ \varkappa_k  \frac{\partial \beta_k}{\partial T}   \right] \cdot {\left[\sum_{g=1}^{N_g}\varkappa_g\frac{\partial \beta_g}{\partial T}\right]}^{-1}\\
+    q_k    &=  \varkappa_k \beta_k  +  \eta \chi_k \left[ Q -  \sum_{g=1}^{N_g}\varkappa_g\frac{\partial \beta_g}{\partial T} \right].
+  \end{align}
+\end{subequations}
+
+\autoref{eq:standard_diffusion} is solved for intensity, then temperature change is recovered afterward. This can be rearranged to further resemble a steady-state neutron diffusion equation,
+
+    \begin{equation}
+  \label{eq:neutron_diffusion}-\nabla \cdot D_k \nabla I_k^{n+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{n+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^{n+1} + S_k
+    \end{equation}
+
+where
+
+\begin{subequations}\label{eq:neutron_xs}
+  \begin{align}
+  \sigma_a     &= \frac{1}{c\Delta t^n}\\
+  \sigma_{f, k} &= \varkappa_k\\
+  S_k &= q_k + \frac{I_k^n}{c\Delta t^n}.
+\end{align}
+\end{subequations}
+
+Here $\sigma_{f, k} = \varkappa_k$ acts as a fission cross section, where photons are re-emitted with the ``fission'' spectrum $\chi_k$, with multiplicity $\eta$, and capture cross section $\sigma_a$. The physical interpretation is that photons may be lost to material absorption or streaming in time (from $\frac{d}{dt}$). Those photons absorbed in the material are either re-emitted in the same time step, or contribute to temperature gain in the material.
+
+The intensity equation is solved using power iteration on the fission source. Starting from initial iterate $I_k^{(0)}$, the $l+1$ iterate for intensity at the $n+1$ time step is found by solving the linear system
+
+\begin{equation}\label{eq:iterative_neutron}
+  -\nabla \cdot D_k \nabla I_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k.
+\end{equation}
+
+The full iterative algorithm is found in \autoref{alg:unaccelerated}.
+
+
+
+\begin{algorithm}
+    \caption{Unaccelerated Iteration Algorithm}\label{alg:unaccelerated}
+  \begin{algorithmic}[0]
+    % \Require{$x$ and $y$ are packed dna strings of equal length $n$}
+    \Statex{}
+    \While{$t^n \leq t^{end}$}
+      \Let{$n$}{$n+1$}
+      \State{Compute (lagged) temperature-dependent coefficients using $T\vert_{t=t^{n-1}}$}
+      \While{$\norm{I^{(l)} - I^{(l-1)}} > \epsilon\norm{I^{(l-1)}}$}
+        \Let{$l$}{$l+1$}
+        \Let{$I_k^{(l+1/2)}$}{Source iteration on $\eta\chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^{n+1}$ (\ref{eq:iterative_neutron})}
+      \EndWhile{}
+      \Let{$I_k^{n}$}{$I_k^{(l+1)}$}
+      \State{Recover $\Delta T^{n+1/2}$ from $I_k^{n}$ (\ref{eq:temperature-change})}
+      \If{$K \neq 0 \land u \neq 0$}
+        \State{Solve thermal diffusion equation for $\Delta T^{n+1}$}
+      \EndIf{}
+      \Let{$T^{n+1}$}{$T^n + \Delta T^{n+1/2} + \Delta T^{n+1}$}
+    \EndWhile{}
+  \end{algorithmic}
+\end{algorithm}
+
+
+
 \subsection{Synthetic Acceleration Method}
 
-\section{Method}
+The equation for exact error of the $l$th iterate (\autoref{eq:iterative_neutron}) is
 
-\subsection{Problem/equations}
+\begin{equation}
+  \label{eq:error-diffusion-equation}-\nabla \cdot D_k\nabla \epsilon_k^{l} + \left(\sigma_a + \sigma_{f, k}\right)\epsilon_k^{l} = \eta \chi_k \sum_{g=1}^{N_g} \sigma_{f, g} \left[ \epsilon_g^{l} +I_g^{l} - I_g^{l-1} \right].
+\end{equation}
+
+At equilibrium, this becomes
+
+\begin{equation}
+  \left(\sigma_a + \sigma_{f, k} \right)\epsilon_k^l = \eta\chi_k \sum_{g=1}^{N_G}\sigma_{f, g}\epsilon_g^l + \eta\chi_k \sum_{g=1}^{N_G}\sigma_{f, g}\left(I_g^l - I_g^{l-1} \right)
+\end{equation}
+
+and the group spectrum of $\epsilon$ is
+
+\begin{equation}\label{eq:spectrum}
+    \frac{\epsilon_k^l}{E^l} = \frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}
+\end{equation}
+
+where
+
+\begin{subequations}
+    \begin{align}
+        E^l &= \sum_{g=1}^{N_g}\epsilon_g^l\\
+        \langle \sigma_t \rangle &= {\left[\sum_{g=1}^{N_g} \frac{\chi_g}{\sigma_{t, g}} \right]}^{-1}.
+    \end{align}
+\end{subequations}
+
+Then, all groups of \autoref{eq:error-diffusion-equation} are summed, using this spectrum, to get
+
+\begin{equation}
+    \label{eq:correction}-\nabla \cdot \left[\langle D \rangle \nabla E^l     +  \langle D^\prime \rangle  E^l    \right]  + E^l \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] =  \eta  r^l
+\end{equation}
+
+where
+
+\begin{subequations}
+ \begin{align}
+  \langle D \rangle &= \sum_{k=1}^{N_g}D_k \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}  \\
+  \langle D^\prime \rangle &= \sum_{k=1}^{N_g} D_k  \nabla   \frac{ \langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}\\
+  \langle \sigma_f \rangle &= \langle \sigma_t \rangle \sum_{g=1}^{N_g} \frac{\chi_g \sigma_{f, g}}{\sigma_{t, g}}\\
+  r^{l+1/2} &= \sum_{g=1}^{N_g} \sigma{f, g} \left( I_g^{l+1/2} - I_g^l\right).
+\end{align} 
+\end{subequations}
+
+Then the spectrum from \autoref{eq:spectrum} can be used to calculate the groupwise correction terms from the grey correction in \autoref{eq:correction}. The accelerated iterative scheme becomes
+
+\begin{subequations}
+    \begin{gather}
+  \label{eq:diffusion-half-iter}-\nabla \cdot D_k \nabla I_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k\\
+  \label{eq:onegroup-error-iter}-\nabla \cdot \left[\langle D \rangle \nabla E^{l+1/2}      +  \langle D^\prime \rangle  E^{l+1/2}    \right]  + E^{l+1/2}  \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] =  \eta  r^{l+1/2} \\
+  \label{eq:fix-diffuion}I^{l+1} = I_k^{l+1} + E^{l+1/2}\frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}
+\end{gather}
+\end{subequations}
+
+
+The accelerated iterative algorithm is displayed in \autoref{alg:accelerated}
+
+
+
+\begin{algorithm}
+    \caption{Accelerated Iteration Algorithm}\label{alg:accelerated}
+  \begin{algorithmic}[0]
+    % \Require{$x$ and $y$ are packed dna strings of equal length $n$}
+    \Statex{}
+    \While{$t^n \leq t^{end}$}
+      \Let{$n$}{$n+1$}
+      \State{Compute (lagged) temperature-dependent coefficients using $T\vert_{t=t^{n-1}}$}
+      \While{$\norm{I^{(l)} - I^{(l-1)}} > \epsilon\norm{I^{(l-1)}}$}
+        \Let{$l$}{$l+1$}
+        \Let{$I_k^{(l+1/2)}$}{Source iteration on $\eta\chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^{n+1}$, using (\ref{eq:diffusion-half-iter})}
+        \Let{$r^{(l+1/2)}$}{$\sum_{g=1}^{N_g} \sigma{f, g} \left( I_g^{l+1/2} - I_g^l\right)$}
+        \Let{$E^l$}{Grey correction equation using (\ref{eq:onegroup-error-iter})}
+        \Let{$I_k^{(l)}$}{$I_k^{(l+1/2)} + E^{l+1/2}\frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}$ using (\ref{eq:fix-diffuion})}
+      \EndWhile{}
+      \Let{$I_k^{n}$}{$I_k^{(l+1)}$}
+      \State{Recover $\Delta T^{n+1/2}$ from $I_k^{n}$}
+      \If{$K \neq 0 \land u \neq 0$}
+        \State{Solve thermal diffusion equation for $\Delta T^{n+1}$}
+      \EndIf{}
+      \Let{$T^{n+1}$}{$T^n + \Delta T^{n+1/2} + \Delta T^{n+1}$}
+    \EndWhile{}
+  \end{algorithmic}
+\end{algorithm}
+
+
+
+
+
+
+\section{Numerical Implementation}
+
+\subsection{LD Formulation}
 \subsection{Unaccelerated Iteration}
 \subsection{Accelerated Iteration}
 \subsection{Fourier Analysis and Convergence}
@@ -45,7 +274,9 @@
 \subsection{Fourier-informed tests}
 
 
-
+\newpage
+\bibliographystyle{ieeetr}
+\bibliography{references.bib}
 
 
 \end{document}

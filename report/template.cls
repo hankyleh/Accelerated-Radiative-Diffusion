@@ -32,13 +32,15 @@
 % \renewcommand\qedsymbol{QED}
 \renewcommand\theoremautorefname{Lemma}
 \renewcommand{\sectionautorefname}{Sec.}
+\newcommand{\algorithmautorefname}{Algorithm}
 
-\setlength{\parindent}{0em}
+
 \setlength{\parskip}{1ex}
+\setlength{\parindent}{0ex}
 % ~~~ declaration of options ~~~~~~~~~
 \renewcommand\thesubsection{\thesection.\arabic{subsection}}
 \titleformat{\section}{\normalfont\Large\bfseries}{\thesection. }{1ex}{}
-\titleformat{\subsection}[runin]{\normalfont\large\bfseries}{\newline\newline\hspace{2em}\thesubsection}{1ex}{}[\setlength{\parindent}{2em}]
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{1ex}{}[\setlength{\parindent}{2ex}]
 
 
 
