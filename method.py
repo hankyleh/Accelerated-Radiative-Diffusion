@@ -15,6 +15,11 @@ def global_mat_elementwise(mesh : tools.Discretization, sigma, D):
 
     half = 2*nx
     
+    # mll = 3
+    # mlr = 0
+    # mrl = 0
+    # mrr = 3
+
     mll = 2
     mlr = 1
     mrl = 1
@@ -244,7 +249,7 @@ def get_HO_source(
         k     : int):
     source = numpy.zeros((4*mesh.nx))
 
-    print(f"Assigning Source, k = {k}")
+    # print(f"Assigning Source, k = {k}")
 
     # compute fission source, add to 'S'
     dx = mesh.dx
@@ -327,7 +332,7 @@ def assemble_LO(mesh : tools.Discretization, coeff : tools.Grey_coeff):
 def unaccelerated_loop(mesh : tools.Discretization, 
                        sol_prev : tools.Transport_solution, 
                        coeff : tools.MG_coefficients, 
-                       exact_inverse):
+                       flags : dict, prog_string : str):
 
 
     last_iteration = copy.deepcopy(sol_prev)
@@ -338,30 +343,32 @@ def unaccelerated_loop(mesh : tools.Discretization,
 
     while (numpy.max(change) > mesh.eps) :
         iter += 1
-        print(f"Iteration {iter}, change = {numpy.max(change)}")
 
-        if exact_inverse == False:
+        if flags["mat_method"] == "lu":
             for k in range(0, mesh.ng):
                 sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
-                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], atol = mesh.eps)
-
-        else:
+                updated_solution.vec[k, :] = sparse.linalg.spsolve(sys.mat, sys.src)
+        elif flags["mat_method"] == "gmres":
+            for k in range(0, mesh.ng):
+                sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
+                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
+        elif flags["mat_method"] == "inv":
             print("Solving system using numpy inv()")
             for k in range(0, mesh.ng):
-                # print(coeff.kappa[:, 0:6])
-                # print("kappa before assigning mat/src")
                 sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
-                print(sys.mat[0:6, 0:6])
-                print("Global matrix sample")
-                print(sys.src[0:6])
-                print("source vector sample")
                 updated_solution.vec[k, :] = numpy.matmul(numpy.linalg.inv(sys.mat.todense()), sys.src) 
 
-
-        last_iteration = copy.deepcopy(updated_solution)
-        diff = abs((updated_solution.intensity / last_iteration.intensity)- 1) 
+        diff = abs((updated_solution.vec / last_iteration.vec)- 1)
+        diff = numpy.nan_to_num(diff)
         
         change = numpy.linalg.norm(diff, 2, axis=1)
+        change = numpy.append(change, numpy.linalg.norm(diff, 2, axis=0))
+        last_iteration = copy.deepcopy(updated_solution)
+
+        if iter % flags["printing_interval"] == 0:
+            print(f"Step {prog_string:<8} Iteration {iter:<5} Max. rel. change {numpy.max(change):.4e}", end="\r", flush=True)
+    # prints again when converged
+    print(f"Step {prog_string:<8} Iteration {iter:<5} Max. rel. change {numpy.max(change):.4e}", end="\r", flush=True)
     return updated_solution.vec
 
 
@@ -387,8 +394,6 @@ def accelerated_loop(mesh : tools.Discretization,
     
 
 
-
-
     change = [1]
     iter = 0
 
@@ -409,8 +414,10 @@ def accelerated_loop(mesh : tools.Discretization,
 
 
         last_iteration.vec[:] = updated_solution.vec[:] + error_soln.vec[:]*numpy.tile(tools.dbl(grey_constants.spectrum), reps = (1, 2))
-        diff = abs((updated_solution.intensity / last_iteration.intensity)- 1) 
+        diff = abs((updated_solution.vec / last_iteration.vec)- 1)
         
+        print(diff[0:6, 0:6])
+        print("Diff, sample")
         change = numpy.linalg.norm(diff, 2, axis=1)
     return updated_solution.vec
     return 0
@@ -422,14 +429,14 @@ def update_temperature(mesh : tools.Discretization,
                        Q = 0):
     # TODO
 
-    print(soln.cell_center_i[0:6, 0:6])
-    print("cell center i, sample")
-    print(coeff.beta[0:6, 0:6])
-    print("beta, sample")
-    print(coeff.kappa[0:6, 0:6])
-    print("kappa, sample")
-    print(coeff.db_dt[0:6, 0:6])
-    print("db_dt, sample")
+    # print(soln.cell_center_i[0:6, 0:6])
+    # print("cell center i, sample")
+    # print(coeff.beta[0:6, 0:6])
+    # print("beta, sample")
+    # print(coeff.kappa[0:6, 0:6])
+    # print("kappa, sample")
+    # print(coeff.db_dt[0:6, 0:6])
+    # print("db_dt, sample")
 
     temp_change = (
         numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0) + Q
@@ -451,8 +458,21 @@ def solve_unaccelerated(mesh : tools.Discretization,
                         first_step_only=False,
                         exact_inverse=False,
                         manual_kappa = False,
-                        print_T_change = False):
+                        print_T_change = False,
+                        print_kappa = False, 
+                        mat_method = "lu",
+                        printing_interval = 5):
     print("Beginning unaccelerated iteration")
+
+    flags = {
+        "accelerated"    : accelerated    ,
+        "first_step_only": first_step_only,
+        "manual_kappa"   : manual_kappa   ,
+        "print_T_change" : print_T_change ,
+        "print_kappa"    : print_kappa    ,
+        "mat_method"     : mat_method,
+        "printing_interval" : printing_interval
+    }
 
     dt = mesh.dt
     nu = mesh.groups
@@ -481,19 +501,22 @@ def solve_unaccelerated(mesh : tools.Discretization,
             print(f"Starting steps towards {mesh.t_stops[stop]}")
 
             for step in range(0, nt[stop]):
+                prog_string = f"{(step + numpy.sum(mesh.nt[0:stop])) + 1}/{numpy.sum(mesh.nt)}"
 
                 if manual_kappa is False:
                     kappa[:] = opacity(mesh, T_iter, k_star)
-                    print(kappa[:, 0:6])
-                    print("assigned kappa for this time step")
+                    if print_kappa is True:
+                        print(kappa[:, 0:6])
+                        print("assigned kappa for this time step")
                 else:
                     print("manually assigning opacity")
-                    kappa[:] = manual_kappa
+                    if print_kappa is True:
+                        kappa[:] = manual_kappa
 
                 coeff = tools.MG_coefficients(mesh)
                 coeff.assign(mesh, kappa, sol_prev, T_iter, Cv, Q)
 
-                transport_iters.vec[:,:]  = unaccelerated_loop(mesh, sol_prev, coeff, exact_inverse)
+                transport_iters.vec[:,:]  = unaccelerated_loop(mesh, sol_prev, coeff, flags, prog_string)
                 sol_prev.vec[:] = transport_iters.vec[:].copy()
 
                 if (sum(math.isnan(transport_iters.cell_center_i[i, j]) for i in range (0, mesh.ng) for j in range(0, mesh.nx)) > 0):
@@ -511,6 +534,7 @@ def solve_unaccelerated(mesh : tools.Discretization,
                     print("Temperature delta")
                 T_iter += copy.deepcopy(change[:])
                 coeff.assign(mesh, kappa, transport_iters, T_iter, Cv, Q)
+                print("")
             transport_output.append(copy.deepcopy(transport_iters))
             temp_output.append(copy.deepcopy(T_iter[:]))
 
