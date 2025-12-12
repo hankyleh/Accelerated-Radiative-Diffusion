@@ -50,17 +50,6 @@ def FC_heatcap(T_b, mesh):
     return (0.5917*A_R*(T_b)**3) * numpy.ones(mesh.cell_centers.size)
 
 
-# Units for scaling computations, such that
-# x_physical = x_working * scale_x
-
-
-
-# test_kappa = FC_opacity(1/physics.K, [2000, 2002]/physics.H, 27)
-# print(test_kappa)
-
-# plt.figure()
-# plt.show()
-
 
 
 
@@ -101,45 +90,25 @@ T_prev  = (500/mesh.K)*numpy.ones((mesh.nx))
 T_bound = (1000/mesh.K)*numpy.ones((mesh.nx))
 kappa   = group_FC_opacity(mesh, T_prev, k_star)
 
-print(kappa[0:6, 0:6])
-print("IC kappa")
-
 
 Cv    = FC_heatcap(1.0/mesh.K, mesh)
 
 
-print(Cv)
-print("Cv")
-print("NOTE Cv has been modified-- check back later")
 
 Q     = numpy.zeros((mesh.ng, mesh.nx))
 
 mesh.I_BC[:, 0] = (physics.group_planck(mesh, T_bound))[:, 0]
 mesh.F_BC[:, 0] = 0.5*(physics.group_planck(mesh, T_bound))[:, 0]
 
-
-
-
-
 sol_prev = tools.Transport_solution(mesh.nx, mesh.ng, numpy.zeros((mesh.ng, 4*mesh.nx)))
 sol_prev.intensity[:,:] = tools.dbl(physics.group_planck(mesh, T_prev))
 
 
 
-kappa_test = 1*numpy.ones((mesh.ng, mesh.nx))
-
 
 T_out, I_out = method.solve_unaccelerated(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv)
 
-print(len(I_out))
-print("I out len")
 
-print(len(T_out))
-print("T out len")
-
-
-print(T_out[-1][0:6] - T_out[-2][0:6])
-print("temp diff")
 
 plt.figure()
 ax = plt.gca()
@@ -148,8 +117,6 @@ for i in range(0, len(I_out)):
     tools.plot_LD_groups(ax, mesh, lines.intensity, [0])
 plt.title(f"Intensity over time")
 plt.autoscale()
-plt.savefig(f"kappa{kappa_test[0, 0]}_intensity.png")
-# plt.close()
 
 plt.figure()
 ax = plt.gca()
@@ -158,15 +125,12 @@ lines = tools.LD_plottable(mesh, I_out[-1].vec)
 tools.plot_LD_groups(ax, mesh, lines.intensity, range(0, mesh.ng))
 plt.title(f"Final groups intensity")
 plt.autoscale()
-plt.savefig(f"kappa{kappa_test[0, 0]}_intensity.png")
 
 # plt.figure()
 # ax = plt.gca()
 # lines = tools.LD_plottable(mesh, I_out[-1].vec)
 # tools.plot_LD_groups(ax, mesh, lines.flux, range(0, mesh.ng))
-# plt.title(f"Test flux, kappa={kappa_test[0, 0]} cm-1")
 # plt.autoscale()
-# plt.savefig(f"kappa{kappa_test[0, 0]}_flux.png")
 # # plt.close()
 
 plt.figure()
@@ -177,9 +141,4 @@ plt.xlabel("X [cm]")
 plt.ylabel("T [eV]")
 plt.title("Temperature over time")
 
-
-
-
 plt.show()
-
-

@@ -15,6 +15,8 @@ def global_mat_elementwise(mesh : tools.Discretization, sigma, D):
 
     half = 2*nx
     
+    # make this an input TODO
+
     # mll = 3
     # mlr = 0
     # mrl = 0
@@ -66,7 +68,6 @@ def global_mat_elementwise(mesh : tools.Discretization, sigma, D):
     for i in range(1, nx):
         # right cells. Left side conditions
 
-        
         I_next_R = 2*i - 1
         I_cell_L = 2*i
         I_cell_R = 2*i +1
@@ -248,41 +249,27 @@ def get_HO_source(
         coeff : tools.MG_coefficients, 
         k     : int):
     source = numpy.zeros((4*mesh.nx))
-
-    # print(f"Assigning Source, k = {k}")
-
-    # compute fission source, add to 'S'
     dx = mesh.dx
     nx = mesh.nx
+
+    # maybe compute mass_global outside loop TODO
     M = tools.M
 
     mass_global = sparse.lil_array((2*nx, 2*nx))
-
     for i in range(0, nx):
         mass_global[2*i : 2*i+2, 2*i : 2*i+2] += M[:]
     mass_global[:] = mass_global.tocsr()
 
-    # print(mass_global[0:6, 0:6])
-    # print("mass matrix sample")
-
-    # print(coeff.sig_f[:, 0:6])
-    # print("kappa sample")
-
+    # total fission
     fiss = numpy.zeros((mesh.ng, 2*nx))
-
     for g in range(0, mesh.ng):
         fiss[g] += tools.dbl(coeff.sig_f[g])*(prev_I[g])
 
-    # print(fiss[0:6, 0:6])
-    # print("Fission source sample")
-
-        
+    # source = q_k + I^n/cdt + fiss
     source[0:2*mesh.nx] += (dx*( mass_global @ coeff.S[k])
                 + (tools.dbl(coeff.eta) * tools.dbl(coeff.chi[k])
                 * dx* (mass_global @ numpy.sum(fiss, axis=0))))
 
-    # print(source[0:6])
-    # print("Source sample before BC")
     # add BCs
     source[0]             += mesh.F_BC[k, 0]
     source[(2*mesh.nx)-1] += -mesh.F_BC[k, 1]
@@ -290,9 +277,6 @@ def get_HO_source(
 
     source[2*mesh.nx] += coeff.D[k, 0] * mesh.I_BC[k, 0]
     source[-1] +=      - coeff.D[k, -1] * mesh.I_BC[k, 1]
-
-    # print(source[0:6])
-    # print("BCs added")
 
 
     return source
@@ -316,16 +300,13 @@ def get_LO_source(mesh : tools.Discretization, coeff : tools.Grey_coeff):
 def assemble_HO(mesh : tools.Discretization, coeff : tools.MG_coefficients, last_iter_I, k):
     system = tools.Global_system()
     system.mat = global_mat_elementwise(mesh, coeff.sig_a+coeff.sig_f[k], coeff.D[k])
-
     system.src = get_HO_source(mesh, last_iter_I, coeff, k)
-
     return system
 
 
 def assemble_LO(mesh : tools.Discretization, coeff : tools.Grey_coeff):
     system = tools.Global_system()
     system.mat = global_mat_elementwise(mesh, coeff.sig_a + (1-coeff.eta)*coeff.sigf_avg, coeff.D_avg)
-
     system.src = get_LO_source(mesh, coeff)
     return system
 
@@ -338,8 +319,8 @@ def unaccelerated_loop(mesh : tools.Discretization,
     updated_solution =  copy.deepcopy(sol_prev)
     
     change = [1]
-    iter = 0
 
+    iter = 0
     while (numpy.max(change) > mesh.eps) :
         iter += 1
 
@@ -368,7 +349,7 @@ def unaccelerated_loop(mesh : tools.Discretization,
             print(f"Step {flags["time_frac"]:<8}"+
                   f"Iteration {iter:<6}"+
                   f"Max. rel. change {numpy.max(change):.4e}  "+
-                  f"{"MANUALLY ASSIGNED KAPPA" * (flags["manual_kappa"] is not False)}"+
+                  f"{"MANUALLY ASSIGNED OPACITY" * (flags["manual_kappa"] is not False)}"+
                   f"'{flags["mat_method"]}' LD solution method  "+
                   f"{"Using Accelerated Algorithm"*(flags["accelerated"] is not False)}",
                         end="\r", flush=True)
@@ -387,7 +368,6 @@ def accelerated_loop(mesh : tools.Discretization,
                        Cv, 
                        Q):
     # TODO
-
 
     coeff = tools.MG_coefficients(mesh)
     I_prev = sol_prev.intensity[:]
@@ -428,33 +408,19 @@ def accelerated_loop(mesh : tools.Discretization,
         print("Diff, sample")
         change = numpy.linalg.norm(diff, 2, axis=1)
     return updated_solution.vec
-    return 0
 
 def update_temperature(mesh : tools.Discretization, 
                        coeff : tools.MG_coefficients, 
                        soln : tools.Transport_solution,
                        Cv,
                        Q = 0):
-    # TODO
-
-    # print(soln.cell_center_i[0:6, 0:6])
-    # print("cell center i, sample")
-    # print(coeff.beta[0:6, 0:6])
-    # print("beta, sample")
-    # print(coeff.kappa[0:6, 0:6])
-    # print("kappa, sample")
-    # print(coeff.db_dt[0:6, 0:6])
-    # print("db_dt, sample")
-
+    
     temp_change = (
         numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0) + Q
     )/(
         (Cv/mesh.dt) + numpy.sum(coeff.kappa * coeff.db_dt, axis=0)
     )
-
     return temp_change
-
-    # calculate planck function, dbdt, all necessary constants
 
 def solve_unaccelerated(mesh : tools.Discretization, 
                         scale : tools.Scales, opacity, 
@@ -486,9 +452,7 @@ def solve_unaccelerated(mesh : tools.Discretization,
     nu = mesh.groups
 
     nt = mesh.nt
-    k_star = 27
-
-    # gets intensity, flux, and temperature at each provided time stop 
+    k_star = 27 # make this an input TODO
 
     transport_output = []
     temp_output = []
@@ -500,51 +464,51 @@ def solve_unaccelerated(mesh : tools.Discretization,
     kappa = numpy.zeros((mesh.ng, mesh.nx))
     change = numpy.zeros(mesh.nx)
 
+    
+    print("unaccelerated method")
+    for stop in range(0, (first_step_only == False)*len(nt) 
+                        + (first_step_only == True)):
 
-    if accelerated == False:
-        print("unaccelerated method")
-        for stop in range(0, (first_step_only == False)*len(nt) 
-                          + (first_step_only == True)):
+        print(f"Starting steps towards {mesh.t_stops[stop]}")
 
-            print(f"Starting steps towards {mesh.t_stops[stop]}")
+        for step in range(0, nt[stop]):
+            flags["time_frac"] = f"{(step + numpy.sum(mesh.nt[0:stop])) + 1}/{numpy.sum(mesh.nt)}"
 
-            for step in range(0, nt[stop]):
-                flags["time_frac"] = f"{(step + numpy.sum(mesh.nt[0:stop])) + 1}/{numpy.sum(mesh.nt)}"
+            if manual_kappa is False:
+                kappa[:] = opacity(mesh, T_iter, k_star)
+            else:
+                    kappa[:] = manual_kappa
+            if print_kappa is True:
+                    print(kappa[:, 0])
+                    print("Group opacity in first cell")
 
-                if manual_kappa is False:
-                    kappa[:] = opacity(mesh, T_iter, k_star)
-                    if print_kappa is True:
-                        print(kappa[:, 0:6])
-                        print("assigned kappa for this time step")
-                else:
-                    print("manually assigning opacity")
-                    if print_kappa is True:
-                        kappa[:] = manual_kappa
+            coeff = tools.MG_coefficients(mesh)
+            coeff.assign(mesh, kappa, sol_prev, T_iter, Cv, Q)
 
-                coeff = tools.MG_coefficients(mesh)
-                coeff.assign(mesh, kappa, sol_prev, T_iter, Cv, Q)
-
+            if accelerated == True:
+                transport_iters.vec[:,:]  = accelerated_loop(mesh, sol_prev, coeff, flags)
+            else:
                 transport_iters.vec[:,:]  = unaccelerated_loop(mesh, sol_prev, coeff, flags)
-                sol_prev.vec[:] = transport_iters.vec[:].copy()
+            sol_prev.vec[:] = transport_iters.vec[:].copy()
 
-                if (sum(math.isnan(transport_iters.cell_center_i[i, j]) for i in range (0, mesh.ng) for j in range(0, mesh.nx)) > 0):
-                    print(transport_iters.intensity)
-                    print("Cell-edge flux")
-                    print(transport_iters.vec[0:6, 0:6])
-                    print("Sample of 'vec'")
-                    print(transport_iters.cell_center_i)
-                    print("Cell-centered flux")
-                    raise ValueError("NaN intensity encountered")
-                    
-                change[:] = update_temperature(mesh, coeff, transport_iters, Cv)
-                if print_T_change == True:
-                    print(change)
-                    print("Temperature delta")
-                T_iter += copy.deepcopy(change[:])
-                coeff.assign(mesh, kappa, transport_iters, T_iter, Cv, Q)
-                print("")
-            transport_output.append(copy.deepcopy(transport_iters))
-            temp_output.append(copy.deepcopy(T_iter[:]))
+            if (sum(math.isnan(transport_iters.cell_center_i[i, j]) for i in range (0, mesh.ng) for j in range(0, mesh.nx)) > 0):
+                print(transport_iters.intensity)
+                print("Cell-edge flux")
+                print(transport_iters.vec[0:6, 0:6])
+                print("Sample of transport solution")
+                print(transport_iters.cell_center_i)
+                print("Cell-centered flux")
+                raise ValueError("NaN intensity encountered")
+                
+            change[:] = update_temperature(mesh, coeff, transport_iters, Cv)
+            if print_T_change == True:
+                print(change)
+                print("Temperature delta")
+            T_iter += copy.deepcopy(change[:])
+            coeff.assign(mesh, kappa, transport_iters, T_iter, Cv, Q)
+            print("")
+        transport_output.append(copy.deepcopy(transport_iters))
+        temp_output.append(copy.deepcopy(T_iter[:]))
 
     else:
         print("accelerated method")
