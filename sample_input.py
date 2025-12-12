@@ -73,6 +73,8 @@ k_star = 27
 
 mesh.groups = numpy.array([0.00000, 0.3, 0.6, 0.8, 1.2, 1.5, 1.8, 2.4, 
                            2.7, 3, 4, 5, 7, 9, 11, 15, 20, 1e4])*(1000/mesh.H)
+
+# mesh.groups = numpy.array([0.000001,  1e4])*(1000/mesh.H)
 mesh.dx = 0.4
 
 
@@ -81,27 +83,11 @@ mesh.I_BC = numpy.zeros((mesh.ng, 2))
 mesh.F_BC = numpy.zeros((mesh.ng, 2))
 
 
-mesh.t_stops = numpy.array([0, 2e-3, 2e-2]) * 1e-8
+mesh.t_stops = numpy.array([0, 2e-3, 1e-2]) * 1e-8
 mesh.dt = 2e-3 * 1e-8 # seconds
 
 
 mesh.eps = 1e-4
-
-
-
-# print(mesh.groups)
-# print("groups, hz")
-
-# print(mesh.groups * physics.H)
-# print("groups, eV")
-
-
-
-
-# plt.figure()
-# plt.show()
-
-
 
 
 
@@ -111,7 +97,7 @@ mesh.eps = 1e-4
 
 
 
-T_prev  = (350/mesh.K)*numpy.ones((mesh.nx))
+T_prev  = (500/mesh.K)*numpy.ones((mesh.nx))
 T_bound = (1000/mesh.K)*numpy.ones((mesh.nx))
 kappa   = group_FC_opacity(mesh, T_prev, k_star)
 
@@ -151,8 +137,6 @@ print("I out len")
 print(len(T_out))
 print("T out len")
 
-print(I_out[1].intensity[0:6, 0:6] - I_out[0].intensity[0:6, 0:6])
-print("intensity diff")
 
 print(T_out[-1][0:6] - T_out[-2][0:6])
 print("temp diff")

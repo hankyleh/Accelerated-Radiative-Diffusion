@@ -332,8 +332,7 @@ def assemble_LO(mesh : tools.Discretization, coeff : tools.Grey_coeff):
 def unaccelerated_loop(mesh : tools.Discretization, 
                        sol_prev : tools.Transport_solution, 
                        coeff : tools.MG_coefficients, 
-                       flags : dict, prog_string : str):
-
+                       flags : dict):
 
     last_iteration = copy.deepcopy(sol_prev)
     updated_solution =  copy.deepcopy(sol_prev)
@@ -365,10 +364,19 @@ def unaccelerated_loop(mesh : tools.Discretization,
         change = numpy.append(change, numpy.linalg.norm(diff, 2, axis=0))
         last_iteration = copy.deepcopy(updated_solution)
 
+        def print_update():
+            print(f"Step {flags["time_frac"]:<8}"+
+                  f"Iteration {iter:<6}"+
+                  f"Max. rel. change {numpy.max(change):.4e}  "+
+                  f"{"MANUALLY ASSIGNED KAPPA" * (flags["manual_kappa"] is not False)}"+
+                  f"'{flags["mat_method"]}' LD solution method  "+
+                  f"{"Using Accelerated Algorithm"*(flags["accelerated"] is not False)}",
+                        end="\r", flush=True)
+
         if iter % flags["printing_interval"] == 0:
-            print(f"Step {prog_string:<8} Iteration {iter:<5} Max. rel. change {numpy.max(change):.4e}", end="\r", flush=True)
+            print_update()
     # prints again when converged
-    print(f"Step {prog_string:<8} Iteration {iter:<5} Max. rel. change {numpy.max(change):.4e}", end="\r", flush=True)
+    print_update()
     return updated_solution.vec
 
 
@@ -501,7 +509,7 @@ def solve_unaccelerated(mesh : tools.Discretization,
             print(f"Starting steps towards {mesh.t_stops[stop]}")
 
             for step in range(0, nt[stop]):
-                prog_string = f"{(step + numpy.sum(mesh.nt[0:stop])) + 1}/{numpy.sum(mesh.nt)}"
+                flags["time_frac"] = f"{(step + numpy.sum(mesh.nt[0:stop])) + 1}/{numpy.sum(mesh.nt)}"
 
                 if manual_kappa is False:
                     kappa[:] = opacity(mesh, T_iter, k_star)
@@ -516,7 +524,7 @@ def solve_unaccelerated(mesh : tools.Discretization,
                 coeff = tools.MG_coefficients(mesh)
                 coeff.assign(mesh, kappa, sol_prev, T_iter, Cv, Q)
 
-                transport_iters.vec[:,:]  = unaccelerated_loop(mesh, sol_prev, coeff, flags, prog_string)
+                transport_iters.vec[:,:]  = unaccelerated_loop(mesh, sol_prev, coeff, flags)
                 sol_prev.vec[:] = transport_iters.vec[:].copy()
 
                 if (sum(math.isnan(transport_iters.cell_center_i[i, j]) for i in range (0, mesh.ng) for j in range(0, mesh.nx)) > 0):
