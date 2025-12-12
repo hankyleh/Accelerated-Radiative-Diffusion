@@ -72,7 +72,7 @@ mesh.I_BC = numpy.zeros((mesh.ng, 2))
 mesh.F_BC = numpy.zeros((mesh.ng, 2))
 
 
-mesh.t_stops = numpy.array([0, 2e-3, 1e-2]) * 1e-8
+mesh.t_stops = numpy.array([0, 2e-3, 2e-2]) * 1e-8
 mesh.dt = 2e-3 * 1e-8 # seconds
 
 
@@ -86,7 +86,7 @@ mesh.eps = 1e-4
 
 
 
-T_prev  = (500/mesh.K)*numpy.ones((mesh.nx))
+T_prev  = (400/mesh.K)*numpy.ones((mesh.nx))
 T_bound = (1000/mesh.K)*numpy.ones((mesh.nx))
 kappa   = group_FC_opacity(mesh, T_prev, k_star)
 
@@ -100,13 +100,16 @@ Q     = numpy.zeros((mesh.ng, mesh.nx))
 mesh.I_BC[:, 0] = (physics.group_planck(mesh, T_bound))[:, 0]
 mesh.F_BC[:, 0] = 0.5*(physics.group_planck(mesh, T_bound))[:, 0]
 
+# mesh.I_BC[:, 1] = (physics.group_planck(mesh, T_bound))[:, 0]
+# mesh.F_BC[:, 1] = -0.5*(physics.group_planck(mesh, T_bound))[:, 0]
+
 sol_prev = tools.Transport_solution(mesh.nx, mesh.ng, numpy.zeros((mesh.ng, 4*mesh.nx)))
 sol_prev.intensity[:,:] = tools.dbl(physics.group_planck(mesh, T_prev))
 
 
 
 
-T_out, I_out = method.solve_unaccelerated(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv)
+T_out, I_out, _ = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=True)
 
 
 

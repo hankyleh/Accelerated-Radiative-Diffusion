@@ -10,25 +10,14 @@ import copy
 from physics import C, SIG_R, A_R, H
 
 
-UNACC = False
-ACC = True
-ONEITER = 1
+B_1 = numpy.array([[-0.25, 0.25, 0,     0   ],
+                        [0,     0,    0.25, -0.25]])
+B_2 = numpy.array([[-0.5, 0,   0.5, 0  ],
+                        [0,   -0.5, 0,   0.5]])
 
 
-b_0i = numpy.array([[-0.25, 0.25, 0,     0   ],
-                    [0,     0,    0.25, -0.25]])
-    
-b_0f = numpy.array([[-0.5,  -0.5, 0,   0  ],
-                    [0,     0,    0.5, 0.5]])
-
-b_1i = numpy.array([[-0.5, -0.5,    0,   0  ],
-                    [ 0,    0,      0.5, 0.5]])
-
-b_1f = numpy.array([[-0.75, 0.75, 0,     0   ],
-                    [ 0,    0,    0.75, -0.75]])
-
-a_f  = numpy.array([[0,  0.5,  0.5, 0],
-                     [0, -0.5, -0.5, 0]])
+M    = (1/6)* numpy.array([[2,1],
+                               [1,2]])
 
 M    = (1/6)*numpy.array([[2, 1],
                               [1, 2]])
@@ -103,13 +92,6 @@ class Discretization:
         self.C = numpy.float128(2.99792458e10)   # cm / s
         self.SIG_R = numpy.float128(3.53916934e7) # eV / (cm^2 * s * K^4)
         self.A_R = numpy.float128(4.72215928e-3)  # eV / (cm^2 * s * K^4)
-        # self.nx = 10
-        # self.nt = numpy.array([50, 100])
-
-        # self.cell_centers = numpy.linspace(0.2, 3.8, 10)
-        # self.cell_edges   = numpy.linspace(0, 4, 11)
-
-        # TODO -- change all these to manual definition as in below. Right now recursive definition.
 
     def rescale(self, rho : Scales):
         self.C = C * rho.t
@@ -135,20 +117,6 @@ class Discretization:
     @property
     def cell_edges(self):
         return numpy.linspace(0, self.x_length, self.nx+1)
-
-# class Local_system():
-#     def __init__(self):
-#         self.range = [0, 0] # domain where this stencil should be applied.
-#                             # from (i = 0 + range[0]) to (i = nx - range[1])
-#         self.size  = [0, 0] # how many elements are [before, after] the regular
-#                             # [xL, xR]?
-#         self.mat   = numpy.array([[[0]], [[0]]]) # stencil values
-#                                 # [action on F]
-#                                        # [Action on I]
-
-#         # maybe remove these
-#         self.row   = 0      # which equations 
-#         self.col   = 0      # which dimension does this stencil apply to
 
 class Global_system():
     def __init__(self):
@@ -192,7 +160,6 @@ class MG_coefficients:
 
 
 class LD_plottable:
-
     def __init__(self, mesh, solution):
         self.intensity = []
         self.flux = []
@@ -274,6 +241,6 @@ class Grey_coeff:
         self.sigt_avg[:] = 1/(numpy.sum(mg_coeff.chi / (sig_t), axis=0))
         self.sigf_avg[:] = self.sigt_avg * numpy.sum(mg_coeff.chi * mg_coeff.sig_f / sig_t, axis=0)
         self.D_avg[:] = self.sigt_avg * numpy.sum(mg_coeff.chi * mg_coeff.D / sig_t, axis=0)
-        self.r[:] = numpy.sum(dbl(mg_coeff.sig_f)*(this_soln.intensity[:] - prev_soln.intensity[:]))
+        self.r[:] = numpy.sum(dbl(mg_coeff.sig_f)*(this_soln.intensity[:] - prev_soln.intensity[:]), axis=0)
         self.eta = copy.deepcopy(mg_coeff.eta)
         self.spectrum[:] = (self.sigt_avg[:] * mg_coeff.chi[:, :] / sig_t)

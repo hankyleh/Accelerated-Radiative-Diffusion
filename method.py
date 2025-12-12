@@ -3,245 +3,70 @@ import tools
 import physics # type: ignore
 import numpy
 import scipy.sparse as sparse
+import scipy
 import copy
 from matplotlib import pyplot as plt
 import math
 
-def global_mat_elementwise(mesh : tools.Discretization, sigma, D):
-    nx = mesh.nx + 0
-    dx = mesh.dx + 0
+def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
+    # LHS of zeroth moment equation plus Fick's Law.
+    # works in the general case-- high order or low order.
 
-    global_matrix = sparse.lil_array((4*nx, 4*nx))
-
-    half = 2*nx
+    nx = mesh.nx
+    dx = mesh.dx
     
-    # make this an input TODO
+    global_matrix = sparse.dok_array((4*nx, 4*nx))
+    # interior elements
 
-    # mll = 3
-    # mlr = 0
-    # mrl = 0
-    # mrr = 3
+    B_1 = tools.B_1
+    B_2 = tools.B_2
 
-    mll = 2
-    mlr = 1
-    mrl = 1
-    mrr = 2
+    M_wide = tools.M_wide
 
-    for i in range(0, nx-1):
-        # left cells. Right side conditions
-        I_next_R = 2*i - 1
-        I_cell_L = 2*i
-        I_cell_R = 2*i +1
-        I_next_L = 2*i +2
+    # interior elements
+    for i in range(1, nx-1):
+        # i = index of current interior cell
 
-        F_next_R = I_next_R + half
-        F_cell_L = I_cell_L + half
-        F_cell_R = I_cell_R + half
-        F_next_L = I_next_L + half
+        l_nbr = (2*i)-1
+        r_nbr = (2*i)+2
+        shft  = (2*nx)
 
-        # left_row_z   = 2*i
-        right_row_z = 2*i +1
+        # zeroth moment, intensity
+        global_matrix[2*i:(2*i + 2), l_nbr:r_nbr+1] += B_1 + (sigma[i]*dx*M_wide)
 
-        # left_row_f = left_row_z + half
-        right_row_f = right_row_z + half
+        # zeroth moment, flux
+        global_matrix[2*i:2*i + 2, l_nbr+shft:r_nbr+shft+1] += B_2
 
-        # print(f"cell number {i}, right equations-- rows{right_row_z}, {right_row_f}")
+        # first moment, intensity
+        global_matrix[2*i +shft:2*i + 2+shft, l_nbr:r_nbr+1] += D[i] * (B_2) 
 
-        # b_R equation
-            # Zeroth moment
-        global_matrix[right_row_z, F_next_L] = 1/2
-        global_matrix[right_row_z, F_cell_L] = -1/2
-        global_matrix[right_row_z, I_cell_R] = 1/4
-        global_matrix[right_row_z, I_next_L] = -1/4
-        global_matrix[right_row_z, I_cell_L] = sigma[i]*mrl*dx/6
-        global_matrix[right_row_z, I_cell_R] += sigma[i]*mrr*dx/6
-            # first moment
-        global_matrix[right_row_f, F_cell_L] = dx*mrl/(6)
-        global_matrix[right_row_f, F_cell_R] = dx*mrr/(6)
-        global_matrix[right_row_f, F_cell_R] += D[i]*3/4
-        global_matrix[right_row_f, F_next_L] = -D[i]*3/4
-        global_matrix[right_row_f, I_next_L] = D[i]*1/2
-        global_matrix[right_row_f, I_cell_L] = -D[i]*1/2
+        # first moment, flux
+        global_matrix[2*i+shft:2*i+2+shft,l_nbr+shft:r_nbr+1+shft] \
+            += (dx*M_wide) + (D[i]*3*B_1)
 
-
-
-    for i in range(1, nx):
-        # right cells. Left side conditions
-
-        I_next_R = 2*i - 1
-        I_cell_L = 2*i
-        I_cell_R = 2*i +1
-        I_next_L = 2*i +2
-
-        F_next_R = I_next_R + half
-        F_cell_L = I_cell_L + half
-        F_cell_R = I_cell_R + half
-        F_next_L = I_next_L + half
-
-        left_row_z   = 2*i
-        # right_row_z = 2*i +1
-
-        left_row_f = left_row_z + half
-        # right_row_f = right_row_z + half
-
-        # b_L equation
-
-        # Zeroth moment
-        global_matrix[left_row_z, F_cell_R] = 1/2
-        global_matrix[left_row_z, F_next_R] = -1/2
-        global_matrix[left_row_z, I_next_R] = -1/4
-        global_matrix[left_row_z, I_cell_L] = 1/4
-        global_matrix[left_row_z, I_cell_L] += sigma[i]*mll*dx/6
-        global_matrix[left_row_z, I_cell_R] += sigma[i]*mlr*dx/6
-
-        # first moment
-        global_matrix[left_row_f, F_cell_L] = dx*mll/(6)
-        global_matrix[left_row_f, F_cell_R] = dx*mlr/(6)
-        global_matrix[left_row_f, F_next_R] = -D[i]*3/4
-        global_matrix[left_row_f, F_cell_L] += D[i]*3/4
-        global_matrix[left_row_f, I_cell_R] = D[i]*1/2
-        global_matrix[left_row_f, I_next_R] = -D[i]*1/2
-
-
-    # left boundary cell, b_L equation
-    i = 0
-    # I_next_R = 2*i - 1
-    I_cell_L = 2*i
-    I_cell_R = 2*i +1
-    I_next_L = 2*i +2
-    # F_next_R = I_next_R + half
-    F_cell_L = I_cell_L + half
-    F_cell_R = I_cell_R + half
-    F_next_L = I_next_L + half
-    left_row_z   = 2*i
-    # right_row_z = 2*i +1
-    left_row_f = left_row_z + half
-
-    # Zeroth moment
-    global_matrix[left_row_z, F_cell_R] = 1/2
-    # global_matrix[left_row_z, F_next_R] = -1/2
-    # global_matrix[left_row_z, I_next_R] = -1/4
-    global_matrix[left_row_z, I_cell_L] = 1/4
-    global_matrix[left_row_z, I_cell_L] += sigma[i]*mll*dx/6
-    global_matrix[left_row_z, I_cell_R] = sigma[i]*mlr*dx/6
-
-    # first moment
-    global_matrix[left_row_f, F_cell_L] = dx*mll/(6)
-    global_matrix[left_row_f, F_cell_R] = dx*mlr/(6)
-    # global_matrix[left_row_f, F_next_R] = -D[i]*3/4
-    global_matrix[left_row_f, F_cell_L] += D[i]*3/4
-    global_matrix[left_row_f, I_cell_R] = D[i]*1/2
-    # global_matrix[left_row_f, I_next_R] = -D[i]*1/2
-
-
-    # right boundary, right equation
-    i = nx-1
-    I_next_R = 2*i - 1
-    I_cell_L = 2*i
-    I_cell_R = 2*i +1
-    # I_next_L = 2*i +2
-    F_next_R = I_next_R + half
-    F_cell_L = I_cell_L + half
-    F_cell_R = I_cell_R + half
-    # F_next_L = I_next_L + half
-    # left_row_z   = 2*i
-    right_row_z = 2*i +1
-    # left_row_f = left_row_z + half
-    right_row_f = right_row_z + half
-
-    # b_R equation
-    # Zeroth moment
-    # global_matrix[right_row_z, F_next_L] = 1/2
-    global_matrix[right_row_z, F_cell_L] = -1/2
-    global_matrix[right_row_z, I_cell_R] = 1/4
-    # global_matrix[right_row_z, I_next_L] = -1/4
-    global_matrix[right_row_z, I_cell_L] += sigma[i]*mrl*dx/6
-    global_matrix[right_row_z, I_cell_R] += sigma[i]*mrr*dx/6
-    # first moment
-    global_matrix[right_row_f, F_cell_L] += dx*mrl/(6)
-    global_matrix[right_row_f, F_cell_R] += dx*mrr/(6)
-    global_matrix[right_row_f, F_cell_R] += D[i]*3/4
-    # global_matrix[right_row_f, F_next_L] = -D[i]*3/4
-    # global_matrix[right_row_f, I_next_L] = D[i]*1/2
-    global_matrix[right_row_f, I_cell_L] += -D[i]*1/2
-
-
-    global_matrix = global_matrix.tocsr()
-
-    # print("Global Matrix assembled.")
-    # print(f"Highest abs: {numpy.max(numpy.abs(global_matrix.todense()))}")
-    # print(f"Lowest abs (nonzero): {numpy.min(numpy.abs(global_matrix.data))}")
-    return global_matrix
-
-
-# Replaced with element-wise assembly
-
-# def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
-#     # LHS of zeroth moment equation plus Fick's Law.
-#     # works in the general case-- high order or low order.
-
-#     # mesh -- variable of type "Discretization"
-#     # sigma-- numpy array of size (Nx, 1)
-#     # D    -- numpy array of size (Nx, 1)
-#     nx = mesh.nx + 0
-#     dx = mesh.dx + 0
-    
-#     global_matrix = sparse.lil_array((4*nx, 4*nx))
-#     # interior elements
-#     b_0i = tools.b_0i
-#     b_0f = tools.b_0f
-#     b_1i = tools.b_1i
-#     b_1f = tools.b_1f
-#     a  = tools.a_f 
-
-#     M_wide = tools.M_wide
-
-#     # interior elements
-#     for i in range(1, nx-1):
-#         # i = index of current interior cell
-
-#         l_nbr = (2*i)-1
-#         r_nbr = (2*i)+2
-#         shft  = (2*nx)
-
-#         # zeroth moment, intensity
-#         global_matrix[2*i:(2*i + 2), l_nbr:r_nbr+1] += b_0i + (sigma[i]*dx*M_wide)
-
-#         # zeroth moment, flux
-#         global_matrix[2*i:2*i + 2, l_nbr+shft:r_nbr+shft+1] += a + b_0f
-
-#         # first moment, intensity
-#         global_matrix[2*i +shft:2*i + 2+shft, l_nbr:r_nbr+1] += D[i] * (b_1i + a) 
-
-#         # first moment, flux
-#         global_matrix[2*i+shft:2*i+2+shft,l_nbr+shft:r_nbr+1+shft] \
-#             += (dx*M_wide) + (D[i]*b_1f)
-
-#     # boundary elements
-#     # -----------------
-#     # Left boundary
-#     # zeroth, intensity
-#     global_matrix[0:2, 0:3] += b_0i[:, 1:] + (sigma[0]*dx*M_wide[:, 1:])
-#     # zeroth, flux
-#     global_matrix[0:2, shft:3+shft] += a[:, 1:] + b_0f[:, 1:]
-#     # first, intensity
-#     global_matrix[shft:2+shft, 0:3] += D[0] * (b_1i[:, 1:] + a[:, 1:]) 
-#     # first, flux
-#     global_matrix[shft:2+shft,shft:3+shft] += ((dx*M_wide[:, 1:]) + 
-#                                                (D[0]*b_1f[:, 1:]))
-#     # Right boundary
-#     # zeroth, intensity
-#     global_matrix[shft-2:shft, shft-3:shft] += b_0i[:, 0:-1] + (sigma[-1]*dx*M_wide[:, 0:-1])
-#     # zeroth, flux
-#     global_matrix[shft-2:shft, -3:] += a[:, 0:-1] + b_0f[:, 0:-1] 
-#     # first, intensity
-#     global_matrix[-2:, shft-3:shft] += D[-1] * (b_1i[:, 0:-1] + a[:, 0:-1]) 
-#     # first, flux
-#     global_matrix[-2:, -3:] += ((dx*M_wide[:, 0:-1]) + 
-#                                                (D[-1]*b_1f[:, 0:-1]))
-
-#     global_matrix = global_matrix.tocsr()
-#     return global_matrix
+    # boundary elements
+    # -----------------
+    # Left boundary
+    # zeroth, intensity
+    global_matrix[0:2, 0:3] += B_1[:, 1:] + (sigma[0]*dx*M_wide[:, 1:])
+    # zeroth, flux
+    global_matrix[0:2, shft:3+shft] +=  B_2[:, 1:]
+    # first, intensity
+    global_matrix[shft:2+shft, 0:3] += D[0] * (B_2[:, 1:]) 
+    # first, flux
+    global_matrix[shft:2+shft,shft:3+shft] += ((dx*M_wide[:, 1:]) + 
+                                               (D[0]*3*B_1[:, 1:]))
+    # Right boundary
+    # zeroth, intensity
+    global_matrix[shft-2:shft, shft-3:shft] += B_1[:, 0:-1] + (sigma[-1]*dx*M_wide[:, 0:-1])
+    # zeroth, flux
+    global_matrix[shft-2:shft, -3:] +=  B_2[:, 0:-1] 
+    # first, intensity
+    global_matrix[-2:, shft-3:shft] += D[-1] * (B_2[:, 0:-1] ) 
+    # first, flux
+    global_matrix[-2:, -3:] += ((dx*M_wide[:, 0:-1]) + 
+                                               (D[-1]*3*B_1[:, 0:-1]))
+    return global_matrix.tocsr()
 
 def get_HO_source(
         mesh  : tools.Discretization, 
@@ -275,8 +100,8 @@ def get_HO_source(
     source[(2*mesh.nx)-1] += -mesh.F_BC[k, 1]
 
 
-    source[2*mesh.nx] += coeff.D[k, 0] * mesh.I_BC[k, 0]
-    source[-1] +=      - coeff.D[k, -1] * mesh.I_BC[k, 1]
+    source[2*mesh.nx] = coeff.D[k, 0] * mesh.I_BC[k, 0]
+    source[-1] =      - coeff.D[k, -1] * mesh.I_BC[k, 1]
 
 
     return source
@@ -299,14 +124,14 @@ def get_LO_source(mesh : tools.Discretization, coeff : tools.Grey_coeff):
 
 def assemble_HO(mesh : tools.Discretization, coeff : tools.MG_coefficients, last_iter_I, k):
     system = tools.Global_system()
-    system.mat = global_mat_elementwise(mesh, coeff.sig_a+coeff.sig_f[k], coeff.D[k])
+    system.mat = assemble_global_matrix(mesh, coeff.sig_a+coeff.sig_f[k], coeff.D[k])
     system.src = get_HO_source(mesh, last_iter_I, coeff, k)
     return system
 
 
 def assemble_LO(mesh : tools.Discretization, coeff : tools.Grey_coeff):
     system = tools.Global_system()
-    system.mat = global_mat_elementwise(mesh, coeff.sig_a + (1-coeff.eta)*coeff.sigf_avg, coeff.D_avg)
+    system.mat = assemble_global_matrix(mesh, coeff.sig_a + (1-coeff.eta)*coeff.sigf_avg, coeff.D_avg)
     system.src = get_LO_source(mesh, coeff)
     return system
 
@@ -323,26 +148,22 @@ def unaccelerated_loop(mesh : tools.Discretization,
     iter = 0
     while (numpy.max(change) > mesh.eps) :
         iter += 1
-
-        if flags["mat_method"] == "lu":
-            for k in range(0, mesh.ng):
-                sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
+        for k in range(0, mesh.ng):
+            sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
+            if flags["mat_method"] == "lu":
                 updated_solution.vec[k, :] = sparse.linalg.spsolve(sys.mat, sys.src)
-        elif flags["mat_method"] == "gmres":
-            for k in range(0, mesh.ng):
-                sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
+            elif flags["mat_method"] == "gmres":
                 updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
-        elif flags["mat_method"] == "inv":
-            print("Solving system using numpy inv()")
-            for k in range(0, mesh.ng):
-                sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
-                updated_solution.vec[k, :] = numpy.matmul(numpy.linalg.inv(sys.mat.todense()), sys.src) 
+            elif flags["mat_method"] == "inv":
+                updated_solution.vec[k, :] = numpy.matmul(scipy.linalg.inv(sys.mat.todense()), sys.src)
+            else:
+                raise ValueError("Invalid solution method provided")
 
         diff = abs((updated_solution.vec / last_iteration.vec)- 1)
         diff = numpy.nan_to_num(diff)
         
-        change = numpy.linalg.norm(diff, 2, axis=1)
-        change = numpy.append(change, numpy.linalg.norm(diff, 2, axis=0))
+        change = scipy.linalg.norm(diff, 2, axis=1)
+        change = numpy.append(change, scipy.linalg.norm(diff, 2, axis=0))
         last_iteration = copy.deepcopy(updated_solution)
 
         def print_update():
@@ -363,51 +184,72 @@ def unaccelerated_loop(mesh : tools.Discretization,
 
 def accelerated_loop(mesh : tools.Discretization, 
                        sol_prev : tools.Transport_solution, 
-                       T_prev, 
-                       kappa, 
-                       Cv, 
-                       Q):
-    # TODO
+                       coeff : tools.MG_coefficients, 
+                       flags : dict):
 
-    coeff = tools.MG_coefficients(mesh)
     I_prev = sol_prev.intensity[:]
-    coeff.assign(mesh, kappa, sol_prev, T_prev, Cv, Q)
-
-    last_iteration   = copy.deepcopy(sol_prev)
+    last_iteration = copy.deepcopy(sol_prev)
     updated_solution =  copy.deepcopy(sol_prev)
     error_soln = copy.deepcopy(sol_prev)
 
-
     grey_constants = tools.Grey_coeff(mesh)
     
-
-
     change = [1]
-    iter = 0
 
+    iter = 0
     while (numpy.max(change) > mesh.eps) :
         iter += 1
-        print(f"Iteration {iter}, change = {numpy.max(change)}")
 
         for k in range(0, mesh.ng):
             sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
-            updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, atol=mesh.eps, rtol = mesh.eps, x0=last_iteration.vec[k])
-
+            if flags["mat_method"] == "lu":
+                updated_solution.vec[k, :] = sparse.linalg.spsolve(sys.mat, sys.src)
+            elif flags["mat_method"] == "gmres":
+                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
+            elif flags["mat_method"] == "inv":
+                updated_solution.vec[k, :] = numpy.matmul(scipy.linalg.inv(sys.mat.todense()), sys.src)
+            else:
+                raise ValueError("Invalid solution method provided")
+        
         grey_constants.assign(mesh, coeff, updated_solution, last_iteration)
 
 
         sys_grey = assemble_LO(mesh, grey_constants)
-        # error_soln.vec[:] , b = sparse.linalg.lgmres(sys_grey.mat, sys_grey.src, atol=mesh.eps, rtol = mesh.eps)
-        error_soln.vec[:] = sparse.linalg.inv(sys_grey.mat) @ sys_grey.src
 
-
-        last_iteration.vec[:] = updated_solution.vec[:] + error_soln.vec[:]*numpy.tile(tools.dbl(grey_constants.spectrum), reps = (1, 2))
-        diff = abs((updated_solution.vec / last_iteration.vec)- 1)
+        if flags["mat_method"] == "lu":
+            error_soln.vec[:] = sparse.linalg.spsolve(sys_grey.mat, sys_grey.src)
+        elif flags["mat_method"] == "gmres":
+            error_soln.vec[:], b = sparse.linalg.gmres(sys_grey.mat, sys_grey.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
+        elif flags["mat_method"] == "inv":
+            error_soln.vec[:] = numpy.matmul(scipy.linalg.inv(sys_grey.mat.todense()), sys_grey.src)
+        else:
+            raise ValueError("Invalid solution method provided")
         
-        print(diff[0:6, 0:6])
-        print("Diff, sample")
-        change = numpy.linalg.norm(diff, 2, axis=1)
+        updated_solution.vec[:] += error_soln.vec[:]*numpy.tile(tools.dbl(grey_constants.spectrum), reps = (1, 2))
+    
+
+        diff = abs((updated_solution.vec / last_iteration.vec)- 1)
+        diff = numpy.nan_to_num(diff)
+        
+        change = scipy.linalg.norm(diff, 2, axis=1)
+        change = numpy.append(change, scipy.linalg.norm(diff, 2, axis=0))
+        last_iteration = copy.deepcopy(updated_solution)
+
+        def print_update():
+            print(f"Step {flags["time_frac"]:<8}"+
+                  f"Iteration {iter:<6}"+
+                  f"Max. rel. change {numpy.max(change):.4e}  "+
+                  f"{"MANUALLY ASSIGNED OPACITY" * (flags["manual_kappa"] is not False)}"+
+                  f"'{flags["mat_method"]}' LD solution method  "+
+                  f"{"Using Accelerated Algorithm"*(flags["accelerated"] is not False)}",
+                        end="\r", flush=True)
+
+        if iter % flags["printing_interval"] == 0:
+            print_update()
+    # prints again when converged
+    print_update()
     return updated_solution.vec
+
 
 def update_temperature(mesh : tools.Discretization, 
                        coeff : tools.MG_coefficients, 
@@ -422,7 +264,7 @@ def update_temperature(mesh : tools.Discretization,
     )
     return temp_change
 
-def solve_unaccelerated(mesh : tools.Discretization, 
+def solve_diffusion(mesh : tools.Discretization, 
                         scale : tools.Scales, opacity, 
                         IC : tools.Transport_solution, 
                         T_init, 
@@ -456,6 +298,7 @@ def solve_unaccelerated(mesh : tools.Discretization,
 
     transport_output = []
     temp_output = []
+    iters_log = []
     transport_iters = copy.deepcopy(IC)
     sol_prev = copy.deepcopy(IC)
 
@@ -498,6 +341,8 @@ def solve_unaccelerated(mesh : tools.Discretization,
                 print("Sample of transport solution")
                 print(transport_iters.cell_center_i)
                 print("Cell-centered flux")
+                print(kappa[:, 0:6])
+                print("opacity sample")
                 raise ValueError("NaN intensity encountered")
                 
             change[:] = update_temperature(mesh, coeff, transport_iters, Cv)
@@ -509,15 +354,5 @@ def solve_unaccelerated(mesh : tools.Discretization,
             print("")
         transport_output.append(copy.deepcopy(transport_iters))
         temp_output.append(copy.deepcopy(T_iter[:]))
-
-    else:
-        print("accelerated method")
-        # TODO, accelerated time stepping
-        pass
-        
-    return temp_output, transport_output
-
-
-
-        
     
+    return temp_output, transport_output, iters_log
