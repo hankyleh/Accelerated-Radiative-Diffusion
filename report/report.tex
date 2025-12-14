@@ -19,7 +19,10 @@
 
 \newcommand*\multbox[1]{\fbox{\hspace{0ex}#1\hspace{0ex}}}
 
+\newcommand{\I}{\mathcal{I}}
+\newcommand{\E}{\mathcal{E}}
 
+\usemintedstyle{fruity}
 
 \begin{document}
 
@@ -39,7 +42,7 @@ The equations for radiative diffusion are
 \end{subequations}
 
 
-where \autoref{eq:spectral_diffusion} is the radiative diffusion equation, where $c$ is the speed of light, $I$ is scalar intensity $I_{\nu}(x) = \int_{4\pi} I_\nu(x,\Omega) d\Omega = cE$, $D$ is the radiative diffusion constant $(3\rho\kappa)^{-1}$, $\kappa$ is specific opacity $[\text{cm}^2/\text{g}]$, and $\beta$ is the angle-integrated Planck function, $\beta_\nu(T) = \int_{4\pi} B_\nu(T)d\Omega$.
+where \autoref{eq:spectral_diffusion} is the radiative diffusion equation, where $c$ is the speed of light, $I$ is scalar intensity $I_{\nu}(x) = \int_{4\pi} \I_\nu(x,\Omega) d\Omega = cE$, $D$ is the radiative diffusion constant $(3\rho\kappa)^{-1}$, $\kappa$ is specific opacity $[\text{cm}^2/\text{g}]$, and $\beta$ is the angle-integrated Planck function, $\beta_\nu(T) = \int_{4\pi} B_\nu(T)d\Omega$.
 
 \autoref{eq:spectral_temperature} is the heat diffusion equation with radiation and hydrodynamic effects, where $\rho$ is material density, $C_v$ is material heat capacity, $K$ is thermal conductivity, $\mathbb{P}$ is the fluid pressure tensor, $u$ is fluid velocity, and $Q$ is heat generation per unit mass.
 
@@ -168,7 +171,7 @@ The full iterative algorithm is found in \autoref{alg:unaccelerated}.
 
 \subsection{Synthetic Acceleration Method}
 
-The equation for exact error of the $l$th iterate (\autoref{eq:iterative_neutron}) is
+The equation for exact multigroup error of the $l$th iterate (\autoref{eq:iterative_neutron}) is
 
 \begin{equation}
   \label{eq:error-diffusion-equation}-\nabla \cdot D_k\nabla \epsilon_k^{l} + \left(\sigma_a + \sigma_{f, k}\right)\epsilon_k^{l} = \eta \chi_k \sum_{g=1}^{N_g} \sigma_{f, g} \left[ \epsilon_g^{l} +I_g^{l} - I_g^{l-1} \right].
@@ -183,14 +186,14 @@ At equilibrium, this becomes
 and the group spectrum of $\epsilon$ is
 
 \begin{equation}\label{eq:spectrum}
-    \frac{\epsilon_k^l}{E^l} = \frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}
+    \frac{\epsilon_k^l}{\E^l} = \frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}
 \end{equation}
 
 where
 
 \begin{subequations}
     \begin{align}
-        E^l &= \sum_{g=1}^{N_g}\epsilon_g^l\\
+        \E^l &= \sum_{g=1}^{N_g}\epsilon_g^l\\
         \langle \sigma_t \rangle &= {\left[\sum_{g=1}^{N_g} \frac{\chi_g}{\sigma_{t, g}} \right]}^{-1}.
     \end{align}
 \end{subequations}
@@ -198,7 +201,7 @@ where
 Then, all groups of \autoref{eq:error-diffusion-equation} are summed, using this spectrum, to get
 
 \begin{equation}
-    \label{eq:correction}-\nabla \cdot \left[\langle D \rangle \nabla E^l     +  \langle D^\prime \rangle  E^l    \right]  + E^l \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] =  \eta  r^l
+    \label{eq:correction}-\nabla \cdot \left[\langle D \rangle \nabla \E^l     +  \langle D^\prime \rangle  \E^l    \right]  + \E^l \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] =  \eta  r^l
 \end{equation}
 
 where
@@ -217,8 +220,8 @@ Then the spectrum from \autoref{eq:spectrum} can be used to calculate the groupw
 \begin{subequations}
     \begin{gather}
   \label{eq:diffusion-half-iter}-\nabla \cdot D_k \nabla I_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k\\
-  \label{eq:onegroup-error-iter}-\nabla \cdot \left[\langle D \rangle \nabla E^{l+1/2}      +  \langle D^\prime \rangle  E^{l+1/2}    \right]  + E^{l+1/2}  \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] =  \eta  r^{l+1/2} \\
-  \label{eq:fix-diffuion}I^{l+1} = I_k^{l+1} + E^{l+1/2}\frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}
+  \label{eq:onegroup-error-iter}-\nabla \cdot \left[\langle D \rangle \nabla \E^{l+1/2}      +  \langle D^\prime \rangle  \E^{l+1/2}    \right]  + \E^{l+1/2}  \left[\sigma_a + \langle \sigma_f \rangle (1 - \eta)\right] =  \eta  r^{l+1/2} \\
+  \label{eq:fix-diffuion}I^{l+1} = I_k^{l+1} + \E^{l+1/2}\frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}
 \end{gather}
 \end{subequations}
 
@@ -227,7 +230,7 @@ The accelerated iterative algorithm is displayed in \autoref{alg:accelerated}
 
 
 
-\begin{algorithm}
+\begin{algorithm}[H]
     \caption{Accelerated Iteration Algorithm}\label{alg:accelerated}
   \begin{algorithmic}[0]
     % \Require{$x$ and $y$ are packed dna strings of equal length $n$}
@@ -239,8 +242,8 @@ The accelerated iterative algorithm is displayed in \autoref{alg:accelerated}
         \Let{$l$}{$l+1$}
         \Let{$I_k^{(l+1/2)}$}{Source iteration on $\eta\chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^{n+1}$, using (\ref{eq:diffusion-half-iter})}
         \Let{$r^{(l+1/2)}$}{$\sum_{g=1}^{N_g} \sigma{f, g} \left( I_g^{l+1/2} - I_g^l\right)$}
-        \Let{$E^l$}{Grey correction equation using (\ref{eq:onegroup-error-iter})}
-        \Let{$I_k^{(l)}$}{$I_k^{(l+1/2)} + E^{l+1/2}\frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}$ using (\ref{eq:fix-diffuion})}
+        \Let{$\E^l$}{Grey correction equation using (\ref{eq:onegroup-error-iter})}
+        \Let{$I_k^{(l)}$}{$I_k^{(l+1/2)} + \E^{l+1/2}\frac{\langle \sigma_t \rangle \chi_k}{\sigma_{t, k}}$ using (\ref{eq:fix-diffuion})}
       \EndWhile{}
       \Let{$I_k^{n}$}{$I_k^{(l+1)}$}
       \State{Recover $\Delta T^{n+1/2}$ from $I_k^{n}$}
@@ -259,7 +262,263 @@ The accelerated iterative algorithm is displayed in \autoref{alg:accelerated}
 
 \section{Numerical Implementation}
 
+Using the multigroup diffusion equation with Backward Euler, lagged coefficients, and implicit temperature to approximate a 1D thermal radiative transfer (TRT) problem gives, at each time step, \autoref{eq:iterative_neutron} can be split into two first-order ODEs,
+
+\begin{subequations}\label{eq:mg-diffusion}
+    \begin{gather}
+        \frac{\partial F_k^{n+1}}{\partial x}  + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k\label{eq:mg-diffusion-zeroth-moment}\\
+        F_k^{n+1} = -D_k \frac{\partial I_k^{n+1}}{\partial x}\label{eq:mg-diffusion-first-moment}\\
+        0 \leq x \leq X, \qquad k = 1,\hdots, N_g\notag
+    \end{gather}
+\end{subequations}
+
+
+where temperature is recovered using \autoref{eq:temperature-change}. Boundary conditions for these equations are given by
+
+\begin{gather}
+    I^+(0) = I_{in}^+\\
+    I^-(X) = I_{in}^-\\
+    F^+(0) = F_{in}^+\\
+    F^-(X) = F_{in}^-
+\end{gather}
+
+where 
+
+\begin{gather}
+    I^\pm = \pm \int_0^{\pm 1} \I(\mu)d\mu   \\
+    F^\pm = \pm \int_0^{\pm 1} \mu \I(\mu)d\mu  
+\end{gather}
+
+First, the spatial domain is divided into $N_x$ cells $K_i = [x_{i-1/2}, x_{i+1/2}]; i=1,\hdots,N_x$, where $x_{1/2} =0$ and $x_{N_x + 1/2} = X$, and in each cell $K_i$ the width is $\Delta x_i = x_{i+1/2} - x_{i-1/2}$. Then, if temperature (and temperature-dependent coefficients) are taken to be constant within each cell, then, in the accelerated correction equation, the term $\langle D^\prime \rangle$ becomes zero, and the grey correction equation has the same form as \autoref{eq:mg-diffusion}, so they may be solved in the same way.
+
 \subsection{LD Formulation}
+
+First, $I$ and $F$ (and the source $S_k$) from \autoref{eq:mg-diffusion} are assumed to take the form
+
+\begin{subequations}\label{eq:assumed-forms}
+    \begin{gather}
+        I(x) = I_{L, i} b_{L, i} + I_{R, i} b_{R, i}\\
+        F(x) = F_{L, i} b_{L, i} + F_{R, i} b_{R, i}\\
+        S(x) = S_{L, i} b_{L, i} + S_{R, i} b_{R, i}\\
+        b_{L, i} = \frac{x_{i+1/2} - x}{\Delta x_i}, \qquad b_{R, i} = \frac{x - x_{i-1/2}}{\Delta x_i}
+    \end{gather}
+\end{subequations}
+
+where the multigroup index $k$ and the time index $n$ have been omitted without loss of generality. The weak form of \autoref{eq:mg-diffusion} is found by multiplying by the test functions $b_{L, i}$ and $b_{R, i}$ and integrating over the cell.
+
+\begin{subequations}
+    \begin{multline}
+        \int_{x_{i-1/2}}^{x_{i+1/2}}\frac{d F^{l+1}}{d x}b_{c, i} dx  + \left( \sigma_a + \sigma_{f} \right)\int_{x_{i-1/2}}^{x_{i+1/2}}I^{l+1} b_{c, i} dx =\\
+         \eta \chi \sum_{g=1}^{N_g}\sigma_{f, g}\int_{x_{i-1/2}}^{x_{i+1/2}}I^{(l)}_g b_{c, i}dx + \int_{x_{i-1/2}}^{x_{i+1/2}}S b_{c, i}dx
+    \end{multline}
+    \begin{equation}
+        \int_{x_{i-1/2}}^{x_{i+1/2}}F^{l+1}b_{c, i}dx = -D \int_{x_{i-1/2}}^{x_{i+1/2}}\frac{d I^{l+1}}{d x}b_{c, i}dx
+    \end{equation}
+    \begin{equation}
+        c = L, R; \qquad i=1,\hdots, N_x \notag
+    \end{equation}
+\end{subequations}
+
+or, rewriting the $\frac{d}{dx}$ terms using integration by parts,
+
+\begin{subequations}
+    \begin{multline}
+        \left[F^{l+1} b_{c, i} \right]_{x-1/2}^{x+1/2} - \int_{x_{i-1/2}}^{x_{i+1/2}}\frac{d  b_{c, i}}{d x}F^{l+1} dx  + \left( \sigma_a + \sigma_{f} \right)\int_{x_{i-1/2}}^{x_{i+1/2}}I^{l+1} b_{c, i} dx =\\
+         \eta \chi \sum_{g=1}^{N_g}\sigma_{f, g}\int_{x_{i-1/2}}^{x_{i+1/2}}I^{(l)}_g b_{c, i}dx + \int_{x_{i-1/2}}^{x_{i+1/2}}S b_{c, i}dx
+    \end{multline}
+    \begin{equation}
+        \int_{x_{i-1/2}}^{x_{i+1/2}}F^{l+1}b_{c, i}dx = -D \left( \left[I^{l+1} b_{c, i} \right]_{x_{i-1/2}}^{x_{i+1/2}} -   \int_{x_{i-1/2}}^{x_{i+1/2}}\frac{d b_{c, i} }{d x}  I^{l+1} dx    \right)
+    \end{equation}
+    \begin{equation}
+        c = L, R; \qquad i=1,\hdots, N_x. \notag
+    \end{equation}
+\end{subequations}
+
+Using the assumed forms in \autoref{eq:assumed-forms} and the interface conditions
+
+\begin{gather}
+    I^b(x_{i+1/2}) = I^+ + I^-  = \frac{1}{2}\left(I_{R, i} + I_{L, i+1} \right) + \frac{3}{4}\left(F_{R, i} - F_{L, i+1} \right)\\
+    F^b(x_{i+1/2}) = F^+ + F^- = \frac{1}{4} \left(I_{R, i} - I_{L, i+1} \right) + \frac{1}{2}\left(F_{R, i} + F_{L, i+1} \right)
+\end{gather}
+
+the local equations on the interior become,
+
+\begin{multline}
+    \frac{1}{4} \left(I_{L, i}^{(l+1)} - I_{R, i-1}^{(l+1)} \right) + \frac{1}{2}\left(F_{R, i}^{(l+1)} - F_{R, i-1}^{(l+1)} \right) + \frac{\sigma_t \Delta x_i}{6} \left( m_{LL} I_{L, i}^{(l+1)} + m_{LR}I_{R, i}^{(l+1)}\right) =\\
+    \eta \chi \sum_{g=1}^{N_g} \frac{\sigma_{f, g} \Delta x_i}{6} \left(m_{LL} I_{g, L, i}^{(l)} + m_{LR} I_{g, R, i}^{(l)} \right) + \frac{\Delta x_i}{6} \left(m_{LL}S_{L, i} + m_{LR}S_{R, i} \right)
+\end{multline}
+\begin{multline}
+    \frac{1}{4} \left(I_{R, i}^{(l+1)} - I_{L, i+1}^{(l+1)} \right) + \frac{1}{2}\left(F_{L, i+1}^{(l+1)} - F_{L, i}^{(l+1)} \right) + \frac{\sigma_t \Delta x_i}{6} \left( m_{RL} I_{g, L, i}^{(l+1)} + m_{RR}I_{g, R, i}^{(l+1)}\right) =\\
+    \eta \chi \sum_{g=1}^{N_g} \frac{\sigma_{f, g} \Delta x_i}{6} \left(m_{RL} I_{L, i}^{(l)} + m_{RR} I_{R, i}^{(l)} \right) + \frac{\Delta x_i}{6} \left(m_{RL}S_{L, i} + m_{RR}S_{R, i} \right)
+\end{multline}
+\begin{equation}
+    \frac{\Delta x_i}{6}\left( m_{LL} F_{L, i} + m_{LR}F_{R, i} \right) + D \left[ \frac{3}{4}\left(F_{L, i} - F_{R, i-1} \right)  + \frac{1}{2}\left(I_{R, i} - I_{R, i-1} \right) \right] = 0
+\end{equation}
+\begin{equation}
+    \frac{\Delta x_i}{6}\left( m_{RL} F_{L, i} + m_{RR}F_{R, i} \right) + D \left[ \frac{3}{4}\left(F_{R, i} - F_{L, i+1} \right)  + \frac{1}{2}\left(I_{L, i+1} - I_{L, i} \right) \right] = 0
+\end{equation}
+
+
+and on the boundaries,
+
+
+\begin{multline}
+    \frac{1}{4} \left(I_{L, i}^{(l+1)}\right) + \frac{1}{2}\left(F_{R, i}^{(l+1)}  \right) + \frac{\sigma_t \Delta x_i}{6} \left( m_{LL} I_{L, i}^{(l+1)} + m_{LR}I_{R, i}^{(l+1)}\right) =\\
+    \eta \chi \sum_{g=1}^{N_g} \frac{\sigma_{f, g} \Delta x_i}{6} \left(m_{LL} I_{g, L, i}^{(l)} + m_{LR} I_{g, R, i}^{(l)} \right) + \frac{\Delta x_i}{6} \left(m_{LL}S_{L, i} + m_{LR}S_{R, i} \right) + F^{in, +}
+\end{multline}
+\begin{multline}
+    \frac{1}{4} \left(I_{R, i}^{(l+1)}  \right) - \frac{1}{2}\left(F_{L, i}^{(l+1)} \right) + \frac{\sigma_t \Delta x_i}{6} \left( m_{RL} I_{L, i}^{(l+1)} + m_{RR}I_{R, i}^{(l+1)}\right) =\\
+    \eta \chi \sum_{g=1}^{N_g} \frac{\sigma_{f, g} \Delta x_i}{6} \left(m_{RL} I_{g, L, i}^{(l)} + m_{RR} I_{g, R, i}^{(l)} \right) + \frac{\Delta x_i}{6} \left(m_{RL}S_{L, i} + m_{RR}S_{R, i} \right) - F^{in, -}
+\end{multline}
+\begin{equation}
+    \frac{\Delta x_i}{6}\left( m_{LL} F_{L, i} + m_{LR}F_{R, i} \right) + D \left[ \frac{3}{4}\left(F_{L, i}  \right)  + \frac{1}{2}\left(I_{R, i}  \right) \right] = DI^{in, +}
+\end{equation}
+\begin{equation}
+    \frac{\Delta x_i}{6}\left( m_{RL} F_{L, i} + m_{RR}F_{R, i} \right) + D \left[ \frac{3}{4}\left(F_{R, i} \right)  - \frac{1}{2}\left(  I_{L, i} \right) \right] = -DI^{in, -}.
+\end{equation}
+
+Written in matrix form, these equations become, on the interior,
+
+
+
+
+\begin{subequations}
+    \begin{equation}
+    \begin{bmatrix}
+        \mat{B}_1 + \sigma \Delta x \overline{\mat{M}} & \mat{B}_2\\
+        D \mat{B}_2 & \Delta x \overline{\mat{M}} + 3 D \mat{B}_1
+    \end{bmatrix}
+    \begin{bmatrix}
+        \vec{I}\\
+        \vec{F}
+    \end{bmatrix} = 
+    \begin{bmatrix}
+        \mat{M}\vec{Q}\\
+        0
+    \end{bmatrix}
+\end{equation}
+
+where 
+
+\begin{gather}
+    \mat{B}_1 = \begin{bmatrix}
+        -1/4 & 1/4 & 0 & 0\\
+        0 & 0 & 1/4 & -1/4
+    \end{bmatrix}\\
+    \mat{B}_2 = \begin{bmatrix}
+        -1/2 & 0 & 1/2 & 0\\
+        0 & -1/2 & 0 & 1/2
+    \end{bmatrix}\\
+    \mat{M} = \frac{1}{6}\begin{bmatrix}
+        m_{LL} & m_{LR}\\
+        m_{RL} & m_{RR}
+    \end{bmatrix}\\
+    \overline{\mat{M}} = \frac{1}{6}\begin{bmatrix}
+        0 & m_{LL} & m_{LR}&0\\
+        0 & m_{RL} & m_{RR}&0
+    \end{bmatrix}
+\end{gather}
+
+\begin{equation}
+    \vec{I} = \begin{pmatrix}
+        I_{R, i-1}\\
+        I_{L, i}\\
+        I_{R, i}\\
+        I_{L, i+1}
+    \end{pmatrix}, \quad \vec{F} = \begin{pmatrix}
+        F_{R, i-1}\\
+        F_{L, i}\\
+        F_{R, i}\\
+        F_{L, i+1}
+    \end{pmatrix}, \quad \vec{Q} = \begin{pmatrix}
+        \eta \chi \sum_g \sigma_{f, g} I_{g, L, i} + S_{L, i}\\
+        \eta \chi \sum_g \sigma_{f, g} I_{g, R, i} + S_{R, i}.
+    \end{pmatrix}
+\end{equation}
+\end{subequations}
+
+On the left and right boundaries, the left- or right-most column of each local matrix is truncated, with the boundary conditions added to the source:
+
+\begin{equation}
+    \begin{bmatrix}
+        \mat{B}^c_1 + \sigma \Delta x \overline{\mat{M}}^c & \mat{B}_2^c\\
+        D \mat{B}_2^c & \Delta x \overline{\mat{M}}^c + 3 D \mat{B}_1^c
+    \end{bmatrix}
+    \begin{bmatrix}
+        \vec{I}^c\\
+        \vec{F}^c
+    \end{bmatrix} = 
+    \begin{bmatrix}
+        \mat{M}\vec{Q} \\
+        0
+    \end{bmatrix} + 
+    \begin{bmatrix}
+        \vec{b}_F \\
+        D \vec{b}_I
+    \end{bmatrix}, c= L, R
+\end{equation}
+
+where, for example,
+
+\begin{equation}
+    \mat{B}_1 = \begin{bmatrix}
+        \cancel{-1/4} & 1/4 & 0 & 0\\
+        \cancel{0} & 0 & 1/4 & -1/4
+    \end{bmatrix} = \mat{B}_1 = \begin{bmatrix}
+        1/4 & 0 & 0\\
+        0 & 1/4 & -1/4
+    \end{bmatrix}, \text{etc},
+\end{equation}
+
+and the boundary vectors are
+
+\begin{equation}
+    \vec{b}_F = \begin{bmatrix}
+        \delta_{c, L}F^{in, +}\\
+        -\delta_{c, R}F^{in, -}
+    \end{bmatrix},\quad \vec{b}_I = \begin{pmatrix}
+        \delta_{c, L}I^{in, +}\\
+        -\delta_{c, R}I^{in, -}
+    \end{pmatrix}.
+\end{equation}
+
+The global matrix is then a $(4N_x \times 4N_x)$ square matrix. In the Python implementation, the first $2N_x$ rows of the global matrix are composed of the first two rows of the local matrix (the zeroth moment equation), and the last $2N_x$ rows of the global matrix are composed of the last two rows of the local matrix (Fick's Law), so that the global system is of the form
+
+\begin{equation}
+    \mat{G} \begin{bmatrix}
+        I\\
+        F
+    \end{bmatrix} = \begin{bmatrix}
+        Q + b_F\\
+        b_I
+    \end{bmatrix}.
+\end{equation}
+
+The global matrix assignment is performed by \texttt{method.assemble\_global\_matrix()}, and the matrix definition can be found in \texttt{tools}. For example, the interior assembly:
+
+\begin{minted}{python}
+    # interior elements
+    for i in range(1, nx-1):
+        R_prev = (2*i)-1
+        L_next = (2*i)+2
+        shift  = (2*nx)
+
+        # zeroth moment, intensity
+        global_matrix[2*i:(2*i + 2), 
+                R_prev:L_next+1] += B_1 + (sigma[i]*dx*M_wide)
+        # zeroth moment, flux
+        global_matrix[2*i:2*i + 2, 
+                        R_prev+shift:L_next+shift+1] += B_2
+
+        # first moment, intensity
+        global_matrix[2*i +shift:2*i + 2+shift, 
+                      R_prev:L_next+1] += D[i] * (B_2) 
+        # first moment, flux
+        global_matrix[2*i+shift:2*i+2+shift,
+                      R_prev+shift:L_next+1+shift]+= (dx*M_wide 
+                                                                 + D[i]*3*B_1)
+\end{minted}
+
 \subsection{Unaccelerated Iteration}
 \subsection{Accelerated Iteration}
 \subsection{Fourier Analysis and Convergence}

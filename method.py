@@ -25,24 +25,24 @@ def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
 
     # interior elements
     for i in range(1, nx-1):
-        # i = index of current interior cell
-
-        l_nbr = (2*i)-1
-        r_nbr = (2*i)+2
-        shft  = (2*nx)
+        R_prev = (2*i)-1
+        L_next = (2*i)+2
+        shift  = (2*nx)
 
         # zeroth moment, intensity
-        global_matrix[2*i:(2*i + 2), l_nbr:r_nbr+1] += B_1 + (sigma[i]*dx*M_wide)
-
+        global_matrix[2*i:(2*i + 2), 
+                R_prev:L_next+1] += B_1 + (sigma[i]*dx*M_wide)
         # zeroth moment, flux
-        global_matrix[2*i:2*i + 2, l_nbr+shft:r_nbr+shft+1] += B_2
+        global_matrix[2*i:2*i + 2, 
+                        R_prev+shift:L_next+shift+1] += B_2
 
         # first moment, intensity
-        global_matrix[2*i +shft:2*i + 2+shft, l_nbr:r_nbr+1] += D[i] * (B_2) 
-
+        global_matrix[2*i +shift:2*i + 2+shift, 
+                      R_prev:L_next+1] += D[i] * (B_2) 
         # first moment, flux
-        global_matrix[2*i+shft:2*i+2+shft,l_nbr+shft:r_nbr+1+shft] \
-            += (dx*M_wide) + (D[i]*3*B_1)
+        global_matrix[2*i+shift:2*i+2+shift,
+                      R_prev+shift:L_next+1+shift]+= (dx*M_wide 
+                                                                 + D[i]*3*B_1)
 
     # boundary elements
     # -----------------
@@ -50,19 +50,19 @@ def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
     # zeroth, intensity
     global_matrix[0:2, 0:3] += B_1[:, 1:] + (sigma[0]*dx*M_wide[:, 1:])
     # zeroth, flux
-    global_matrix[0:2, shft:3+shft] +=  B_2[:, 1:]
+    global_matrix[0:2, shift:3+shift] +=  B_2[:, 1:]
     # first, intensity
-    global_matrix[shft:2+shft, 0:3] += D[0] * (B_2[:, 1:]) 
+    global_matrix[shift:2+shift, 0:3] += D[0] * (B_2[:, 1:]) 
     # first, flux
-    global_matrix[shft:2+shft,shft:3+shft] += ((dx*M_wide[:, 1:]) + 
+    global_matrix[shift:2+shift,shift:3+shift] += ((dx*M_wide[:, 1:]) + 
                                                (D[0]*3*B_1[:, 1:]))
     # Right boundary
     # zeroth, intensity
-    global_matrix[shft-2:shft, shft-3:shft] += B_1[:, 0:-1] + (sigma[-1]*dx*M_wide[:, 0:-1])
+    global_matrix[shift-2:shift, shift-3:shift] += B_1[:, 0:-1] + (sigma[-1]*dx*M_wide[:, 0:-1])
     # zeroth, flux
-    global_matrix[shft-2:shft, -3:] +=  B_2[:, 0:-1] 
+    global_matrix[shift-2:shift, -3:] +=  B_2[:, 0:-1] 
     # first, intensity
-    global_matrix[-2:, shft-3:shft] += D[-1] * (B_2[:, 0:-1] ) 
+    global_matrix[-2:, shift-3:shift] += D[-1] * (B_2[:, 0:-1] ) 
     # first, flux
     global_matrix[-2:, -3:] += ((dx*M_wide[:, 0:-1]) + 
                                                (D[-1]*3*B_1[:, 0:-1]))
