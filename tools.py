@@ -80,6 +80,8 @@ class Discretization:
         self.I_BC = numpy.zeros((1, 2))
         self.F_BC = numpy.zeros((1, 2))
         self.eps = 1e-6
+        self.eps_c = 1e-2 # 'coarse' epsilon-- for Newton iteration
+        self.eps_f = 1e-8 # 'fine' epsilon-- for gmres
 
         self.H = numpy.float128(4.135667696e-15) # eV * s
         self.K = numpy.float128(8.617333262e-5)  # eV / K

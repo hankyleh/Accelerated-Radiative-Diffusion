@@ -161,7 +161,7 @@ def unaccelerated_loop(mesh : tools.Discretization,
             if flags["mat_method"] == "lu":
                 updated_solution.vec[k, :] = sparse.linalg.spsolve(sys.mat, sys.src)
             elif flags["mat_method"] == "gmres":
-                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
+                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = mesh.eps_f)
             elif flags["mat_method"] == "inv":
                 updated_solution.vec[k, :] = numpy.matmul(scipy.linalg.inv(sys.mat.todense()), sys.src)
             else:
@@ -220,7 +220,7 @@ def accelerated_loop(mesh : tools.Discretization,
             if flags["mat_method"] == "lu":
                 updated_solution.vec[k, :] = sparse.linalg.spsolve(sys.mat, sys.src)
             elif flags["mat_method"] == "gmres":
-                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
+                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = mesh.eps_f)
             elif flags["mat_method"] == "inv":
                 updated_solution.vec[k, :] = numpy.matmul(scipy.linalg.inv(sys.mat.todense()), sys.src)
             else:
@@ -234,7 +234,7 @@ def accelerated_loop(mesh : tools.Discretization,
         if flags["mat_method"] == "lu":
             error_soln.vec[:] = sparse.linalg.spsolve(sys_grey.mat, sys_grey.src)
         elif flags["mat_method"] == "gmres":
-            error_soln.vec[:], b = sparse.linalg.gmres(sys_grey.mat, sys_grey.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
+            error_soln.vec[:], b = sparse.linalg.gmres(sys_grey.mat, sys_grey.src, x0=last_iteration.vec[k], rtol = mesh.eps_f)
         elif flags["mat_method"] == "inv":
             error_soln.vec[:] = numpy.matmul(scipy.linalg.inv(sys_grey.mat.todense()), sys_grey.src)
         else:

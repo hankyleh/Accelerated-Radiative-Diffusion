@@ -48,6 +48,7 @@ mesh.dx = 0.4
 mesh.t_stops = numpy.array([0, 2e-3, 2e-2, 5e-2, 1e-1]) * 1e-8
 mesh.dt = 2e-3 * 1e-8 # seconds
 mesh.eps = 1e-3
+mesh.eps_c = 1e-2
 
 
 
