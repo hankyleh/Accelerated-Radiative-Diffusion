@@ -26,6 +26,8 @@ def cumulative_sigma(mesh, T, nu):
 
 def group_planck(mesh, T):
     # evaluates integral(B) d nu, along each group bound
+    # "beta" is the planck function integrated over 4pi,
+    #  beta = 4pi * (2h nu^3 / c^2)/(e^h nu/kT - 1)
     groups = mesh.groups[:, numpy.newaxis].reshape((mesh.ng+1, 1))
 
     if numpy.size(T) != 1:

@@ -1,0 +1,59 @@
+\documentclass{template}
+\title{Installation Instructions for Python Code}
+
+\author{Kyle Hansen}
+\date{NE 795 Computational Project\\
+14 December 2025}
+
+\usepackage{cancel}
+\usepackage{xcolor}
+
+
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+
+\usepackage{dirtree}
+
+\newcommand*\Let[2]{\State{#1 $\gets$ #2}}
+\algrenewcommand\algorithmicrequire{\textbf{Precondition:}}
+\algrenewcommand\algorithmicensure{\textbf{Postcondition:}}
+
+
+\newcommand*\multbox[1]{\fbox{\hspace{0ex}#1\hspace{0ex}}}
+
+\newcommand{\I}{\mathcal{I}}
+\newcommand{\E}{\mathcal{E}}
+
+\definecolor{base03}{HTML}{002b36}
+\definecolor{bg-light}{rgb}{0.95, 0.95, 0.95}
+
+\newminted{python}{style=lightbulb, bgcolor=base03}
+\newmintinline{python}{style=xcode, bgcolor=bg-light}
+
+\begin{document}
+
+\maketitle
+
+\section{Instructions}
+
+The code can be installed from the \href{https://github.com/hankyleh/Accelerated-Radiative-Diffusion#}{GitHub repository} using:
+
+\begin{minted}[bgcolor=bg-light]{bash}
+git clone https://github.com/hankyleh/Accelerated-Radiative-Diffusion.git
+\end{minted}
+
+
+The code requires Numpy, Scipy, and Matplotlib, and should be installed in an environment with these packages, or one should be created:
+
+\begin{minted}[bgcolor=bg-light]{bash}
+python -m venv venv
+source venv/bin/activate
+pip install numpy scipy matplotlib
+\end{minted}
+
+
+\section{Guide to operating code}
+
+An input file should, at minimum, contain a function to compute group opacity, define $C_v$, initialize a variable of class Discretization, and define boundary and initial conditions. The method is called with
+
+\end{document}

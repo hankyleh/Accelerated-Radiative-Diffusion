@@ -11,21 +11,15 @@ from physics import C, SIG_R, A_R, H
 
 
 B_1 = numpy.array([[-0.25, 0.25, 0,     0   ],
-                        [0,     0,    0.25, -0.25]])
+                   [ 0,    0,    0.25, -0.25]])
 B_2 = numpy.array([[-0.5, 0,   0.5, 0  ],
-                        [0,   -0.5, 0,   0.5]])
-
+                   [ 0,  -0.5, 0,   0.5]])
 
 M    = (1/6)* numpy.array([[2,1],
-                               [1,2]])
-
-M    = (1/6)*numpy.array([[2, 1],
-                              [1, 2]])
+                           [1,2]])
 M_wide = (1/6)*numpy.array([[0, 2, 1, 0],
-                              [0, 1, 2, 0]])
+                            [0, 1, 2, 0]])
 
-colors = cycle(['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-                           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'])
 
 def dbl(array):
     if array.ndim > 1:
@@ -158,6 +152,29 @@ class MG_coefficients:
         self.S[:,:] = dbl(self.q) + I_prev/(mesh.C*mesh.dt)
         self.D[:,:] = 1/(3*self.kappa[:,:])
 
+class Grey_coeff:
+    def __init__(self, mesh : Discretization):
+        self.D_avg = numpy.zeros((mesh.nx))
+        self.siga_avg = numpy.zeros((mesh.nx))
+        self.sigf_avg = numpy.zeros((mesh.nx))
+        self.sigt_avg = numpy.zeros((mesh.nx))
+        self.r = numpy.zeros((2*mesh.nx))
+        self.eta = 1
+        self.sig_a = 1
+        self.spectrum = numpy.ones((mesh.ng, mesh.nx))/mesh.ng
+    def assign(self, 
+               mesh: Discretization, 
+               mg_coeff : MG_coefficients, 
+               this_soln : Transport_solution, 
+               prev_soln = Transport_solution):
+        sig_t = mg_coeff.sig_a + mg_coeff.sig_f
+        self.sig_a = copy.deepcopy(mg_coeff.sig_a)
+        self.sigt_avg[:] = 1/(numpy.sum(mg_coeff.chi / (sig_t), axis=0))
+        self.sigf_avg[:] = self.sigt_avg * numpy.sum(mg_coeff.chi * mg_coeff.sig_f / sig_t, axis=0)
+        self.D_avg[:] = self.sigt_avg * numpy.sum(mg_coeff.chi * mg_coeff.D / sig_t, axis=0)
+        self.r[:] = numpy.sum(dbl(mg_coeff.sig_f)*(this_soln.intensity[:] - prev_soln.intensity[:]), axis=0)
+        self.eta = copy.deepcopy(mg_coeff.eta)
+        self.spectrum[:] = (self.sigt_avg[:] * mg_coeff.chi[:, :] / sig_t)
 
 class LD_plottable:
     def __init__(self, mesh, solution):
@@ -206,6 +223,9 @@ class LD_plottable:
         self.grey_intensity = LineCollection(grey_segments_I)
         self.grey_flux = LineCollection(grey_segments_F)
 
+colors = cycle(['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+                           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'])
+
 def plot_LD_groups(a, mesh : Discretization, lines: LineCollection, groups=[0]):
     legend_proxies = []
     legend_labels = []
@@ -227,26 +247,3 @@ def plot_LD_grey(a,  lines: LineCollection):
     c.set_color(col)
     a.add_collection(c)
 
-class Grey_coeff:
-    def __init__(self, mesh : Discretization):
-        self.D_avg = numpy.zeros((mesh.nx))
-        self.siga_avg = numpy.zeros((mesh.nx))
-        self.sigf_avg = numpy.zeros((mesh.nx))
-        self.sigt_avg = numpy.zeros((mesh.nx))
-        self.r = numpy.zeros((2*mesh.nx))
-        self.eta = 1
-        self.sig_a = 1
-        self.spectrum = numpy.ones((mesh.ng, mesh.nx))/mesh.ng
-    def assign(self, 
-               mesh: Discretization, 
-               mg_coeff : MG_coefficients, 
-               this_soln : Transport_solution, 
-               prev_soln = Transport_solution):
-        sig_t = mg_coeff.sig_a + mg_coeff.sig_f
-        self.sig_a = copy.deepcopy(mg_coeff.sig_a)
-        self.sigt_avg[:] = 1/(numpy.sum(mg_coeff.chi / (sig_t), axis=0))
-        self.sigf_avg[:] = self.sigt_avg * numpy.sum(mg_coeff.chi * mg_coeff.sig_f / sig_t, axis=0)
-        self.D_avg[:] = self.sigt_avg * numpy.sum(mg_coeff.chi * mg_coeff.D / sig_t, axis=0)
-        self.r[:] = numpy.sum(dbl(mg_coeff.sig_f)*(this_soln.intensity[:] - prev_soln.intensity[:]), axis=0)
-        self.eta = copy.deepcopy(mg_coeff.eta)
-        self.spectrum[:] = (self.sigt_avg[:] * mg_coeff.chi[:, :] / sig_t)

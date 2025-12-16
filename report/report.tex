@@ -7,10 +7,13 @@
 12 December 2025}
 
 \usepackage{cancel}
+\usepackage{xcolor}
 
 
 \usepackage{algpseudocode}
 \usepackage{algorithm}
+
+\usepackage{dirtree}
 
 \newcommand*\Let[2]{\State{#1 $\gets$ #2}}
 \algrenewcommand\algorithmicrequire{\textbf{Precondition:}}
@@ -22,7 +25,11 @@
 \newcommand{\I}{\mathcal{I}}
 \newcommand{\E}{\mathcal{E}}
 
-\usemintedstyle{fruity}
+\definecolor{base03}{HTML}{002b36}
+\definecolor{bg-light}{rgb}{0.95, 0.95, 0.95}
+
+\newminted{python}{style=lightbulb, bgcolor=base03}
+\newmintinline{python}{style=xcode, bgcolor=bg-light}
 
 \begin{document}
 
@@ -141,7 +148,7 @@ The intensity equation is solved using power iteration on the fission source. St
   -\nabla \cdot D_k \nabla I_k^{l+1} + \left( \sigma_a + \sigma_{f, k} \right)I_k^{l+1} = \eta \chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^l + S_k.
 \end{equation}
 
-The full iterative algorithm is found in \autoref{alg:unaccelerated}.
+The full iterative algorithm is displayed in \autoref{alg:unaccelerated}.
 
 
 
@@ -494,9 +501,9 @@ The global matrix is then a $(4N_x \times 4N_x)$ square matrix. In the Python im
     \end{bmatrix}.
 \end{equation}
 
-The global matrix assignment is performed by \texttt{method.assemble\_global\_matrix()}, and the matrix definition can be found in \texttt{tools}. For example, the interior assembly:
+In the Python code, the global matrix assembly from local matrices is performed by the function {\pythoninline/method.assemble_global_matrix()/}, and the matrix definition can be found in {\pythoninline/tools/}. For example, the interior assembly:
 
-\begin{minted}{python}
+\begin{pythoncode}
     # interior elements
     for i in range(1, nx-1):
         R_prev = (2*i)-1
@@ -516,24 +523,233 @@ The global matrix assignment is performed by \texttt{method.assemble\_global\_ma
         # first moment, flux
         global_matrix[2*i+shift:2*i+2+shift,
                       R_prev+shift:L_next+1+shift]+= (dx*M_wide 
-                                                                 + D[i]*3*B_1)
-\end{minted}
+                                                        + D[i]*3*B_1)
+\end{pythoncode}
+
+and the boundary element assembly:
+
+\begin{pythoncode}
+    # Left boundary
+    # zeroth, intensity
+    global_matrix[0:2, 0:3] += B_1[:, 1:] + (sigma[0]*dx*M_wide[:, 1:])
+    # zeroth, flux
+    global_matrix[0:2, shift:3+shift] +=  B_2[:, 1:]
+    # first, intensity
+    global_matrix[shift:2+shift, 
+                  0:3] += D[0] * (B_2[:, 1:]) 
+    # first, flux
+    global_matrix[shift:2+shift,
+                  shift:3+shift] += ((dx*M_wide[:, 1:]) +
+                                               (D[0]*3*B_1[:, 1:]))
+    # Right boundary
+    # zeroth, intensity
+    global_matrix[shift-2:shift, 
+                  shift-3:shift] += (B_1[:, 0:-1] + 
+                                     (sigma[-1]*dx*M_wide[:, 0:-1]))
+    # zeroth, flux
+    global_matrix[shift-2:shift, 
+                  -3:] +=  B_2[:, 0:-1] 
+    # first, intensity
+    global_matrix[-2:, 
+                  shift-3:shift] += D[-1] * (B_2[:, 0:-1] ) 
+    # first, flux
+    global_matrix[-2:, 
+                  -3:] += ((dx*M_wide[:, 0:-1]) + 
+                                        (D[-1]*3*B_1[:, 0:-1]))
+\end{pythoncode}
+
+where the local matrices are
+
+\begin{pythoncode}
+B_1 = numpy.array([[-0.25, 0.25, 0,     0   ],
+                   [ 0,    0,    0.25, -0.25]])
+B_2 = numpy.array([[-0.5, 0,   0.5, 0  ],
+                   [ 0,  -0.5, 0,   0.5]])
+
+M    = (1/6)* numpy.array([[2,1],
+                           [1,2]])
+M_wide = (1/6)*numpy.array([[0, 2, 1, 0],
+                            [0, 1, 2, 0]])
+\end{pythoncode}
 
 \subsection{Unaccelerated Iteration}
+
+The unaccelerated iteration is performed according to \autoref{alg:unaccelerated}. The iteration occurs in two layers, time advancement and power iterations within each time step.
+
+\begin{itemize}
+    \item Calculate $\varkappa$ and assign all multigroup coefficients using {\pythoninline/coeff.assign()/}
+    \item Call {\pythoninline/unaccelerated_loop()/} to solve for intensity
+    \item Recover temperature change from intensity using {\pythoninline/update_temperature()/}
+\end{itemize}
+
+and, within {\pythoninline/unaccelerated_loop()/}:
+
+\begin{itemize}
+    \item Begin with previous solution as initial guess
+    \item Until $\max_k \norm{I_k^{(l+1)}}_2/\norm{I^{(l)}}_2 < \epsilon$ {\pythoninline/and/} $\max_i |I_{i}^{(l+1)}|/|I_{i}^{(l)}| < \epsilon$, do for each group:
+    \begin{itemize}
+        \item Call {\pythoninline/assemble_HO()/} to assemble high-order (multigroup) matrix and source using previously computed coefficients, and previous iterate for the fission source
+        \item Solve system. {\pythoninline/scipy.sparse.linalg.spsolve()/}, which uses $LU$ decomposition, was found to perform the best
+    \end{itemize}
+\end{itemize}
+
+The function {\pythoninline/assemble_HO()/} calls {\pythoninline/assemble_global_matrix()/} to assemble the global matrix as described above, and calls {\pythoninline/get_HO_source()/} to compute the source as a function of the previous iterate and apply the boundary conditions.
+
+The number of iterations is output with the solution once convergence is reached. The number of linear solves is equal to {\pythoninline/iters * mesh.ng/}.
+
+
 \subsection{Accelerated Iteration}
-\subsection{Fourier Analysis and Convergence}
+
+The accelerated iteration is performed according to \autoref{alg:accelerated}. The numerical implementation is much the same as the unaccelerated case, plus the computation of grey coefficients, and another linear solve of the grey system at each step. The behavior of {\pythoninline/solve_diffusion()/} is the same at each time step in the accelerated case, but instead calls the accelerated iteration scheme:
+
+\begin{itemize}
+    \item Calculate $\varkappa$ and assign all multigroup coefficients using {\pythoninline/coeff.assign()/}
+    \item Call {\pythoninline/accelerated_loop()/} to solve for intensity
+    \item Recover temperature change from intensity using {\pythoninline/update_temperature()/}
+\end{itemize}
+
+Each call of {\pythoninline/accelerated_loop()/} does the following:
+
+\begin{itemize}
+    \item Begin with previous solution as initial guess
+    \item Until $\max_k \norm{I_k^{(l+1)}}_2/\norm{I^{(l)}}_2 < \epsilon$ {\pythoninline/and/} $\max_i |I_{i}^{(l+1)}|/|I_{i}^{(l)}| < \epsilon$, do:
+    \begin{itemize}
+        \item For each group:
+        \begin{itemize}
+        \item Call {\pythoninline/assemble_HO()/} to assemble high-order (multigroup) matrix and source using previously computed coefficients, and previous iterate for the fission source
+        \item Solve system using {\pythoninline/scipy.sparse.linalg.spsolve()/}
+    \end{itemize}
+    \item Calculate grey coefficients using {\pythoninline/grey_constants.assign()/}
+    \item Call {\pythoninline/assemble_LO()/} to assemble low-order (grey) matrix and source ($\eta r^{l+1/2}$).
+    \item Solve system using {\pythoninline/scipy.sparse.linalg.spsolve()/}
+    \end{itemize}
+\end{itemize}
+
+The number of linear solves in this case is equal to {\pythoninline/iters * (1 + mesh.ng)/}, since each iteration is composed of one multigroup iteration (one solve for each group) and one grey solve.
+
+
+The full directory for the Python code can be found in \autoref{sec:tree}.
+
+
+
+% \subsection{Fourier Analysis and Convergence}
 
 \section{Tests}
 \subsection{Fleck and Cummings Test}
 
-\subsection{Test A1, nonzero boundary conditions}
+The Fleck and Cummings Test \cite{fleck1971implicit} is a slab with $X=4$ cm, and opacity defined by
+
+\begin{equation}
+    \varkappa_\nu(T) = \frac{\varkappa_0}{(h\nu)^3}\left(1 - e^{-\frac{h\nu}{kT}} \right)
+\end{equation}
+
+where $h\nu$ and $kT$ are in keV. At the left boundary, 
+
+\begin{equation}
+    \I_\nu|_{x=0, \mu > 0} = B_\nu(T_b)
+\end{equation}
+
+where $T_b = 1$ keV. The right boundary is vacuum
+
+\begin{equation}
+    \I_\nu|_{x=x, \mu < 0} = 0
+\end{equation}
+
+and the initial distribution in the domain at $t=0$ is given by
+
+\begin{equation}
+    \I_\nu (t=0) = B_\nu (T_0)
+\end{equation}
+
+where $T_0 = 1$ eV. The material heat capacity is given by
+
+\begin{equation}
+    C_v = 0.5917a_R (T_b)^3.
+\end{equation}
+
+For the diffusion problem, these conditions become:
+
+\begin{gather}
+    I^{in, +} = \int_{0}^{1}\I(\mu)|_{x=0} d\mu = \frac{1}{2}\beta_k (T_b)\\
+    I^{in, -} = -\int_{0}^{-1}\I(\mu)|_{x=0} d\mu = \frac{1}{2}\beta_k (T_b)\\
+    F^{in, -} = \int_{0}^{-1}\mu\I(\mu)|_{x=0} d\mu = \frac{1}{4}\beta_k (T_b)\\
+    F^{in, -} = -\int_{0}^{-1}\mu\I(\mu)|_{x=0} d\mu = -\frac{1}{4}\beta_k (T_b)
+\end{gather}
+
+\subsection{Test A1, steady-state solution}
+
+The opacity and initial condition for this test are the same as for the Fleck and Cummings test, but with different boundary conditions. The initial radiation and temperature distribution remain
+
+\begin{gather}
+    T(x)|_{t=0} = T_0\\
+    \I_\nu |_{t=0} = B_\nu (T_0)
+\end{gather}
+
+and the boundary conditions are
+
+\begin{gather}
+    \I_\nu|_{x=0, \mu > 0} = B_\nu(T_0)\\
+    \I_\nu|_{x=X, \mu < 0} = B_\nu(T_0).
+\end{gather}
+
+Then, for the diffusion method, this becomes
+
+\begin{gather}
+    I^{in, +}= \frac{1}{2}\beta_k(T_0)\\
+    I^{in, -}= \frac{1}{2}\beta_k(T_0)\\
+    F^{in, +}= \frac{1}{4}\beta_k(T_0)\\
+    F^{in, -}= -\frac{1}{4}\beta_k(T_0)\\
+    I(x)|_{t=0} = \beta_k(T_0)\\
+    F(x)|_{t=0} = 0.
+\end{gather}
 
 \subsection{Test A2, one group}
 
 \subsection{Fourier-informed tests}
-
-
 \newpage
+
+\appendix
+
+\section{Python Functions}
+\label{sec:tree}
+
+\newcommand{\descript}[1]{\dotfill \begin{minipage}[t]{5cm} #1 
+\end{minipage}\hspace{2.5cm}}
+
+\dirtree{%
+    .1 /.
+    .2 method\DTcomment{All iteration, acceleration}.
+    .3 assemble\_global\_matrix()\descript{Assemble global LD FEM matrix}.
+    .3 get\_HO\_source() \descript{for group $k$, compute fission source, time differencing source, external source, and add boundary conditions}.
+    .3 get\_LO\_source().
+    .3 assemble\_HO()\descript{Compute global matrix and source, assemble into class}.
+    .3 assemble\_LO().
+    .3 unaccelerated\_loop()\descript{For a single time step. Call assemble\_HO and solve system until convergence is reached}.
+    .3 accelerated\_loop()\descript{Same as unaccelerated\_loop(), but includes grey correction term. Assemble and solve HO system, compute grey coefficients, solve grey system, get corrected iterate, until convergence}.
+    .3 update\_temperature()\descript{\autoref{eq:temperature-change}}.
+    .3 solve\_diffusion()\descript{handles time advancement. At each time step, call appropriate ...loop(), record results}.
+    .2 tools\DTcomment{Data classes, plotting tools, local matrices}.
+    .3 B\_1, B\_2, M, M\_wide\descript{Local LD matrices}.
+    .3 dbl()\descript{Repeat mesh.nx array to be 2*mesh.nx. Prepares piecewise constant values (opacity, temperature, etc) for use in LD solution}.
+    .3 Transport\_solution\descript{Contains intensity and flux}.
+    .3 Discretization\descript{Contains discretization parameters dt, dx, group structure, etc, and constants for computational units}.
+    .3 Global\_system\descript{Global matrix and source vector}.
+    .3 MG\_coefficients \descript{$\sigma_k, \eta, \chi_k, \frac{\partial \beta}{\partial T}, \beta_k, D_k, S_k, \varkappa_k$}.
+    .3 Grey\_coeff\descript{$\langle D \rangle, \langle \sigma_f \rangle, \langle \sigma_t \rangle, r$}.
+    .3 LD\_plottable\descript{Prepares LD solution for plotting}.
+    .3 plot\_LD\_groups().
+    .3 plot\_LD\_grey().
+    .2 physics\DTcomment{Physical constants, Planck Function and derivative}.
+    .3 cumulative\_sigma()\descript{Group Stefan-Boltzmann constant}.
+    .3 group\_planck()\descript{Grouped Planck spectrum}.
+    .3 cumulative\_dsigma\_dt().
+    .3 group\_db\_dt().
+}
+
+
+
+
+
 \bibliographystyle{ieeetr}
 \bibliography{references.bib}
 

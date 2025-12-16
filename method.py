@@ -7,6 +7,8 @@ import scipy
 import copy
 from matplotlib import pyplot as plt
 import math
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
     # LHS of zeroth moment equation plus Fick's Law.
@@ -52,20 +54,27 @@ def assemble_global_matrix(mesh  : tools.Discretization, sigma, D):
     # zeroth, flux
     global_matrix[0:2, shift:3+shift] +=  B_2[:, 1:]
     # first, intensity
-    global_matrix[shift:2+shift, 0:3] += D[0] * (B_2[:, 1:]) 
+    global_matrix[shift:2+shift, 
+                  0:3] += D[0] * (B_2[:, 1:]) 
     # first, flux
-    global_matrix[shift:2+shift,shift:3+shift] += ((dx*M_wide[:, 1:]) + 
+    global_matrix[shift:2+shift,
+                  shift:3+shift] += ((dx*M_wide[:, 1:]) +
                                                (D[0]*3*B_1[:, 1:]))
     # Right boundary
     # zeroth, intensity
-    global_matrix[shift-2:shift, shift-3:shift] += B_1[:, 0:-1] + (sigma[-1]*dx*M_wide[:, 0:-1])
+    global_matrix[shift-2:shift, 
+                  shift-3:shift] += (B_1[:, 0:-1] + 
+                                     (sigma[-1]*dx*M_wide[:, 0:-1]))
     # zeroth, flux
-    global_matrix[shift-2:shift, -3:] +=  B_2[:, 0:-1] 
+    global_matrix[shift-2:shift, 
+                  -3:] +=  B_2[:, 0:-1] 
     # first, intensity
-    global_matrix[-2:, shift-3:shift] += D[-1] * (B_2[:, 0:-1] ) 
+    global_matrix[-2:, 
+                  shift-3:shift] += D[-1] * (B_2[:, 0:-1] ) 
     # first, flux
-    global_matrix[-2:, -3:] += ((dx*M_wide[:, 0:-1]) + 
-                                               (D[-1]*3*B_1[:, 0:-1]))
+    global_matrix[-2:, 
+                  -3:] += ((dx*M_wide[:, 0:-1]) + 
+                                        (D[-1]*3*B_1[:, 0:-1]))
     return global_matrix.tocsr()
 
 def get_HO_source(
@@ -100,9 +109,8 @@ def get_HO_source(
     source[(2*mesh.nx)-1] += -mesh.F_BC[k, 1]
 
 
-    source[2*mesh.nx] = coeff.D[k, 0] * mesh.I_BC[k, 0]
-    source[-1] =      - coeff.D[k, -1] * mesh.I_BC[k, 1]
-
+    source[2*mesh.nx] += coeff.D[k, 0] * mesh.I_BC[k, 0]
+    source[-1] +=      - coeff.D[k, -1] * mesh.I_BC[k, 1]
 
     return source
 
@@ -159,11 +167,18 @@ def unaccelerated_loop(mesh : tools.Discretization,
             else:
                 raise ValueError("Invalid solution method provided")
 
-        diff = abs((updated_solution.vec / last_iteration.vec)- 1)
+        diff = abs((updated_solution.intensity / last_iteration.intensity)- 1)
         diff = numpy.nan_to_num(diff)
-        
-        change = scipy.linalg.norm(diff, 2, axis=1)
-        change = numpy.append(change, scipy.linalg.norm(diff, 2, axis=0))
+
+        # norm along space (keep all groups)
+        change = scipy.linalg.norm(diff, 2, axis=1)                       
+        # norm along groups
+        change = numpy.append(change, scipy.linalg.norm(diff, 2, axis=0)) 
+
+        if flags["print_iter_change"] is True:
+            print(change)
+            print("iteration change")
+
         last_iteration = copy.deepcopy(updated_solution)
 
         def print_update():
@@ -228,7 +243,7 @@ def accelerated_loop(mesh : tools.Discretization,
         updated_solution.vec[:] += error_soln.vec[:]*numpy.tile(tools.dbl(grey_constants.spectrum), reps = (1, 2))
     
 
-        diff = abs((updated_solution.vec / last_iteration.vec)- 1)
+        diff = abs((updated_solution.intensity / last_iteration.intensity)- 1)
         diff = numpy.nan_to_num(diff)
         
         change = scipy.linalg.norm(diff, 2, axis=1)
@@ -277,7 +292,9 @@ def solve_diffusion(mesh : tools.Discretization,
                         print_T_change = False,
                         print_kappa = False, 
                         mat_method = "lu",
-                        printing_interval = 5):
+                        printing_interval = 5,
+                        print_coeff = False,
+                        print_iter_change = False):
     print("Beginning unaccelerated iteration")
 
     flags = {
@@ -287,7 +304,9 @@ def solve_diffusion(mesh : tools.Discretization,
         "print_T_change" : print_T_change ,
         "print_kappa"    : print_kappa    ,
         "mat_method"     : mat_method,
-        "printing_interval" : printing_interval
+        "printing_interval" : printing_interval,
+        "print_coeff"    : print_coeff,
+        "print_iter_change" : print_iter_change
     }
 
     dt = mesh.dt
@@ -328,6 +347,20 @@ def solve_diffusion(mesh : tools.Discretization,
             coeff = tools.MG_coefficients(mesh)
             coeff.assign(mesh, kappa, sol_prev, T_iter, Cv, Q)
 
+            if print_coeff is True:
+                print()
+                print(coeff.chi[:, 0])
+                print(coeff.chi[:, -1])
+                print("Chi_k, first cell; last cell")
+                print(coeff.eta[0])
+                print(coeff.eta[-1])
+                print("Eta, first cell; last cell")
+                print(coeff.sig_a)
+                print("Absorption sigma")
+                print(coeff.sig_f[:, 0])
+                print(coeff.sig_f[:, -1])
+                print("sig_f, first cell; last cell")
+
             if accelerated == True:
                 transport_iters.vec[:,:], inners  = accelerated_loop(mesh, sol_prev, coeff, flags)
             else:
@@ -364,3 +397,4 @@ def solve_diffusion(mesh : tools.Discretization,
         temp_output.append(copy.deepcopy(T_iter[:]))
     
     return temp_output, transport_output, iters_log
+
