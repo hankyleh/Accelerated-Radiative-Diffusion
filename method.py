@@ -273,13 +273,13 @@ def accelerated_loop(mesh : tools.Discretization,
         last_iteration = copy.deepcopy(updated_solution)
 
         def print_update():
-            print(f"Step {flags["time_frac"]:<8}"+
+            print(f"\rStep {flags["time_frac"]:<8}"+
                   f"Iteration {iter:<6}"+
                   f"Max. rel. change {numpy.max(change):.4e}  "+
                   f"{"MANUALLY ASSIGNED OPACITY" * (flags["manual_kappa"] is not False)}"+
                   f"'{flags["mat_method"]}' LD solution method  "+
-                  f"{"Using Accelerated Algorithm"*(flags["accelerated"] is not False)}",
-                        end="\r", flush=True)
+                  f"{"Using Accelerated Algorithm"*(flags["accelerated"] is not False)}", 
+                  end = "", flush=True)
 
         if iter % flags["printing_interval"] == 0:
             print_update()
@@ -291,12 +291,13 @@ def accelerated_loop(mesh : tools.Discretization,
 def loop(mesh : tools.Discretization, 
          sol_prev : tools.Transport_solution, 
          coeff : tools.MG_coefficients, 
-         flags : dict):
+         flags : dict,
+         guess = None):
 
     if flags["accelerated"] == True:
-        transport_sol, inners  = accelerated_loop(mesh, sol_prev, coeff, flags)
+        transport_sol, inners  = accelerated_loop(mesh, sol_prev, coeff, flags, guess)
     else:
-        transport_sol, inners  = unaccelerated_loop(mesh, sol_prev, coeff, flags)
+        transport_sol, inners  = unaccelerated_loop(mesh, sol_prev, coeff, flags, guess)
 
     return transport_sol, inners
     
@@ -315,6 +316,28 @@ def update_temperature(mesh : tools.Discretization,
     )/(
         (Cv/mesh.dt) + numpy.sum(coeff.kappa * coeff.db_dt, axis=0)
     )
+
+    # if (sum(math.isnan(temp_change[j]) for j in range(0, mesh.nx)) > 0):
+    #     print(temp_change[:])
+    #     print("temp change")
+    #     print(coeff.kappa[:, 0:3])
+    #     print("kappa sample")
+    #     # print(soln.cell_center_i[0:6, 0:6])
+    #     # print("cell center i sample")
+    #     # print(coeff.beta[0:6, 0:6])
+    #     # print("beta sample")
+    #     print((Cv/mesh.dt) + numpy.sum(coeff.kappa * coeff.db_dt, axis=0))
+    #     print("denominator")
+    #     print( numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0) + Q)
+    #     print("numerator")
+    #     print(numpy.sum(coeff.kappa * coeff.db_dt, axis=0))
+    #     print("sum term")
+    #     print(coeff.db_dt[:, 0:3])
+    #     print("dbdt")
+
+    #     raise ValueError("NaN dT encountered")
+    
+
     return temp_change
 
 def solve_diffusion(mesh : tools.Discretization, 
@@ -333,7 +356,8 @@ def solve_diffusion(mesh : tools.Discretization,
                         printing_interval = 5,
                         print_coeff = False,
                         print_iter_change = False,
-                        coarse = False):
+                        coarse = False,
+                        Newton = True):
     print("Beginning unaccelerated iteration")
 
     flags = {
@@ -375,6 +399,7 @@ def solve_diffusion(mesh : tools.Discretization,
         print(f"Starting steps towards {mesh.t_stops[stop]}")
 
         for step in range(0, nt[stop]):
+            inners = 0
             flags["time_frac"] = f"{(step + numpy.sum(mesh.nt[0:stop])) + 1}/{numpy.sum(mesh.nt)}"
 
             if manual_kappa is False:
@@ -402,41 +427,101 @@ def solve_diffusion(mesh : tools.Discretization,
                 print(coeff.sig_f[:, -1])
                 print("sig_f, first cell; last cell")
 
-            dbdt = coeff.db_dt
-            slope = numpy.zeros((mesh.ng, mesh.nx))
 
-            slope_change = 1
+            def check_nan(mesh : tools.Discretization, soln : tools.Transport_solution, prev = None):
+                if (sum(math.isnan(soln.intensity[i, j]) for i in range (0, mesh.ng) for j in range(0, 2*mesh.nx)) > 0):
+                    print(soln.intensity)
+                    print("Cell-edge flux")
+                    print(soln.vec[0:6, 0:6])
+                    print("Sample of transport solution")
+                    print(soln.cell_center_i)
+                    print("Cell-centered flux")
+                    print(kappa[:, 0:6])
+                    print("opacity sample")
+                    print(T_n[:])
+                    print("Temperature")
+                    print(dT[:])
+                    print("most recent temperature change")
 
-            # iterate until slope is good
-            # while slope_change > mesh.eps_c:
-            #     flags["coarse"] = True
-            #     vec, new_inners = loop(mesh, sol_prev, coeff, flags)
-            #     dT[:] = update_temperature(mesh, coeff, transport_iters, Cv)
-            #     dBeta = physics.group_planck(mesh, T_n + dT) - coeff.beta
-                # print(dBeta[:, 0])
-                # print("change in beta")
-                # iterate until dT is good
-                # calculate new slope
-                # pass
-            
-            # finish iterations using new slope
-            flags["coarse"] = coarse
+                    plt.figure()
+                    ax = plt.gca()
+                    lines = tools.LD_plottable(mesh, (1/mesh.C)*physics.ev_to_erg*soln.vec)
+                    tools.plot_LD_groups(ax, mesh, lines.intensity, range(0, mesh.ng))
+                    plt.title(f"Energy density")
+                    plt.xlabel("x [cm]")
+                    plt.autoscale()
+
+
+                    plt.figure()
+                    plt.plot(mesh.cell_centers, mesh.K*T_n)
+                    plt.xlabel("x [cm]")
+                    plt.ylabel("T [eV]")
+                    plt.title("Temperature")
+
+                    if prev is not None:
+                        print(prev.vec[0:6, 0:6])
+                        print("previous solution sample")
+                        print()
+                        plt.figure()
+                        ax = plt.gca()
+                        lines = tools.LD_plottable(mesh, (1/mesh.C)*physics.ev_to_erg*prev.vec)
+                        tools.plot_LD_groups(ax, mesh, lines.intensity, range(0, mesh.ng))
+                        plt.title(f"Previous iteration Energy density")
+                        plt.xlabel("x [cm]")
+                        plt.autoscale()
+
+                    plt.show()
+                    raise ValueError("NaN intensity encountered")
+                return 0
+
+            if Newton is True:
+                alpha = 0.05
+                dbdt = coeff.db_dt
+                slope = numpy.zeros((mesh.ng, mesh.nx))
+
+                slope_change = 1
+                slope_iters = 0
+                # iterate until slope is good
+
+                # check dT first
+                transport_iters.vec[:,:], new_inners = loop(mesh, sol_prev, coeff, flags, guess = transport_iters)
+                inners += new_inners
+                dT[:] = update_temperature(mesh, coeff, transport_iters, Cv)
+                if numpy.linalg.norm(dT/T_n, 2) > alpha:
+                    while (slope_change > mesh.eps_c):
+                        slope_iters += 1
+                        flags["coarse"] = True
+                        temporary_transport = copy.deepcopy(transport_iters)
+                        transport_iters.vec[:,:], new_inners = loop(mesh, sol_prev, coeff, 
+                                                                    flags, guess = transport_iters)
+                        check_nan(mesh, transport_iters, prev=temporary_transport)
+                        inners += new_inners
+                        dT[:] = update_temperature(mesh, coeff, transport_iters, Cv)
+                        dBeta = physics.group_planck(mesh, (T_n + dT)) - coeff.beta
+                        slope = dBeta / dT
+                        change_vec = numpy.sum(numpy.abs( (slope / coeff.db_dt)-1 ),axis=0)
+                        change_vec = numpy.nan_to_num(change_vec)
+                        slope_change = numpy.max(change_vec)
+                        print()
+                        print(slope_change)
+                        print("slope change")
+                        coeff.db_dt[:, :] = slope
+                else:
+                    pass
+                    # dT was small; use dB/dT|_n
+                # finish iterations using new slope
+                flags["coarse"] = coarse
+
 
             # calculate flux and intensity, record iterations
-            transport_iters.vec[:,:], inners = loop(mesh, sol_prev, 
-                                                    coeff, flags)
+            temporary_transport = copy.deepcopy(transport_iters)
+            transport_iters.vec[:,:], new_inners = loop(mesh, sol_prev, coeff, 
+                                                        flags, guess = transport_iters)
+            check_nan(mesh, transport_iters, prev = temporary_transport)
+            inners += new_inners
             sol_prev.vec[:] = transport_iters.vec[:].copy()
 
-            if (sum(math.isnan(transport_iters.cell_center_i[i, j]) for i in range (0, mesh.ng) for j in range(0, mesh.nx)) > 0):
-                print(transport_iters.intensity)
-                print("Cell-edge flux")
-                print(transport_iters.vec[0:6, 0:6])
-                print("Sample of transport solution")
-                print(transport_iters.cell_center_i)
-                print("Cell-centered flux")
-                print(kappa[:, 0:6])
-                print("opacity sample")
-                raise ValueError("NaN intensity encountered")
+            
             
             if accelerated == True:
                 iters_log[:,step + numpy.sum(mesh.nt[0:stop])] = inners * numpy.array([1, mesh.ng + 1]).transpose()
