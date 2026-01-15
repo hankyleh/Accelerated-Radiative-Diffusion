@@ -11,6 +11,8 @@ tpls/
 *.toc
 *.bbl
 *.xdv
+*.out
+*.snm
 
 __pycache__/
 venv/
