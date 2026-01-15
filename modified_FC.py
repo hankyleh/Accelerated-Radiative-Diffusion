@@ -52,8 +52,8 @@ mesh.groups = numpy.array([0.00000, 0.3, 0.6, 0.8, 1.2, 1.5, 1.8, 2.4,
                            2.7, 3, 4, 5, 7, 9, 11, 15, 20, 1e4])*(1000/mesh.H)
 mesh.dx = 0.4
 # mesh.t_stops = numpy.array([0, 2e-3, 2e-2, 5e-2, 1e-1, 2e-1, 3e-1]) * 1e-8
-mesh.t_stops = numpy.array([0, 2e-3]) * 1e-8
-mesh.dt = 2e-4 * 1e-8 # seconds
+mesh.t_stops = numpy.array([0, 2e-3, 2e-2]) * 1e-8
+mesh.dt = 2e-3 * 1e-8 # seconds
 mesh.eps = 1e-4
 mesh.eps_c = 1e-2
 mesh.eps_f = 1e-6
@@ -62,7 +62,7 @@ mesh.eps_f = 1e-6
 
 
 
-T_prev  = (50/mesh.K)*numpy.ones((mesh.nx))
+T_prev  = (1/mesh.K)*numpy.ones((mesh.nx))
 T_bound = (1000/mesh.K)*numpy.ones((mesh.nx))
 mesh.I_BC = numpy.zeros((mesh.ng, 2))
 mesh.F_BC = numpy.zeros((mesh.ng, 2))
@@ -71,7 +71,7 @@ mesh.F_BC[:, 0] = 0.25*(physics.group_planck(mesh, T_bound))[:, 0]
 
 kappa   = group_FC_opacity(mesh, T_prev, k_star)
 
-Cv    = FC_heatcap(1.0/mesh.K, mesh)
+Cv    = FC_heatcap(10/mesh.K, mesh)
 Q     = numpy.zeros((mesh.ng, mesh.nx))
 
 
@@ -84,7 +84,7 @@ sol_prev.intensity[:,:] = tools.dbl(physics.group_planck(mesh, T_prev))
 
 
 # Plot and compare to FC IMC results
-T_out, I_out, acc_iters = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=True)
+T_out, I_out, acc_iters = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=True, Newton=False)
 # T_out, I_out, unacc_iters = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=False)
 
 print(f"{(1/mesh.C)*physics.ev_to_erg*numpy.sum(mesh.I_BC[:, 0], axis=0):.4e}")

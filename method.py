@@ -502,6 +502,13 @@ def solve_diffusion(mesh : tools.Discretization,
                         change_vec = numpy.sum(numpy.abs( (slope / coeff.db_dt)-1 ),axis=0)
                         change_vec = numpy.nan_to_num(change_vec)
                         slope_change = numpy.max(change_vec)
+                        if slope_iters > 40:
+                            # TODO : temporary fix for no convergence.
+                            # FIND OUT WHY THIS IS OCCURING
+                            print("No Newton convergence")
+                            coeff.db_dt[:, :] = dbdt
+                            break
+
                         print()
                         print(slope_change)
                         print("slope change")

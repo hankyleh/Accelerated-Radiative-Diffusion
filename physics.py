@@ -40,7 +40,7 @@ def group_planck(mesh, T):
 
     if numpy.size(T) != 1:
         T.reshape((1, mesh.nx))
-        T[T<0] = K*1e-6
+        T[T<0] = K*mesh.eps
         t = numpy.tile(T, (mesh.ng+1, 1))
     else:
         t = numpy.tile(T, (mesh.ng+1, mesh.nx))
@@ -83,7 +83,7 @@ def group_dB_dT(mesh, T):
     groups = mesh.groups[:, numpy.newaxis].reshape((mesh.ng+1, 1))
     if numpy.size(T) != 1:
         T.reshape((1, mesh.nx))
-        T[T<0] = K*1e-6
+        T[T<0] = K*mesh.eps
         t = numpy.tile(T, (mesh.ng+1, 1))
     else:
         t = numpy.tile(T, (mesh.ng+1, mesh.nx))
