@@ -27,7 +27,7 @@
 \definecolor{base03}{HTML}{002b36}
 \definecolor{bg-light}{rgb}{0.95, 0.95, 0.95}
 
-\newminted{python}{style=lightbulb, bgcolor=base03}
+\newminted{python}{style=lightbulb, bgcolor=bg-light}
 \newmintinline{python}{style=xcode, bgcolor=bg-light}
 
 \begin{document}
@@ -42,7 +42,7 @@ The code can be installed from the \href{https://github.com/hankyleh/Accelerated
 git clone https://github.com/hankyleh/Accelerated-Radiative-Diffusion.git
 \end{minted}
 
-
+A snapshot of the code as of 23 January 2026 is also available by downloading the \href{https://github.com/hankyleh/Accelerated-Radiative-Diffusion/archive/refs/tags/1_23_2026.tar.gz}{\mintinline{python}|.tar.gz|} or \href{https://github.com/hankyleh/Accelerated-Radiative-Diffusion/archive/refs/tags/1_23_2026.zip}{\mintinline{python}|.zip|} files.
 The code requires Numpy, Scipy, and Matplotlib, and should be installed in an environment with these packages, or one should be created:
 
 \begin{minted}[bgcolor=bg-light]{bash}
@@ -54,6 +54,19 @@ pip install numpy scipy matplotlib
 
 \section{Guide to operating code}
 
-An input file should, at minimum, contain a function to compute group opacity, define $C_v$, initialize a variable of class Discretization, and define boundary and initial conditions. The method is called with
+An input file should, at minimum, contain a function to compute group opacity, define $C_v$, initialize a variable of class Discretization, and define boundary and initial conditions. The method is run by calling \mintinline{python}|method.solve_diffusion()| using the inputs
+
+\begin{minted}{python}
+solve_diffusion(mesh : tools.Discretization, 
+                scale : tools.Scales, 
+                opacity, 
+                IC : tools.Transport_solution, 
+                T_init, 
+                Cv, 
+                Q=0, 
+                **args):
+\end{minted}
+
+where \mintinline{python3}|mesh| contains the boundary conditions and discretization parameters, and \mintinline{python3}|scale| contains the scaling parameters for computational units.
 
 \end{document}
