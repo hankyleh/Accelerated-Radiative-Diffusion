@@ -4,6 +4,7 @@ import tools # type: ignore
 import method
 import physics
 import matplotlib.pyplot as plt
+import math
 
 # Define temperature-dependent coefficients as functions
 def FC_opacity(T, nu, k0, mesh):
@@ -25,6 +26,12 @@ def group_FC_opacity(mesh, T, k0):
     for g in range(0, mesh.ng):
         for x in range(0, mesh.nx):
             kappa[g, x] = FC_opacity(T[x], mesh.groups[g:g+2], k0, mesh)
+    if (sum(math.isnan(kappa[i, j]) for i in range (0, mesh.ng) for j in range(0, mesh.nx)) > 0):
+        print(kappa[:,:])
+        print("kappa")
+        print(T[:])
+        print("temperature")
+        raise ValueError("NaN temperature encountered")
     return kappa
 
 def FC_heatcap(T_b, mesh):
@@ -45,15 +52,17 @@ mesh.groups = numpy.array([0.00000, 0.3, 0.6, 0.8, 1.2, 1.5, 1.8, 2.4,
                            2.7, 3, 4, 5, 7, 9, 11, 15, 20, 1e4])*(1000/mesh.H)
 mesh.dx = 0.4
 # mesh.t_stops = numpy.array([0, 2e-3, 2e-2, 5e-2, 1e-1, 2e-1, 3e-1]) * 1e-8
-mesh.t_stops = numpy.array([0, 2e-3, 2e-2, 5e-2, 1e-1]) * 1e-8
+mesh.t_stops = numpy.array([0, 2e-3, 2e-2, 5e-2, 1e-1 ,2e-1, 3e-1]) * 1e-8
 mesh.dt = 2e-3 * 1e-8 # seconds
 mesh.eps = 1e-4
+mesh.eps_c = 1e-2
+mesh.eps_f = 1e-6
 
 
 
 
 
-T_prev  = (200/mesh.K)*numpy.ones((mesh.nx))
+T_prev  = (1/mesh.K)*numpy.ones((mesh.nx))
 T_bound = (1000/mesh.K)*numpy.ones((mesh.nx))
 mesh.I_BC = numpy.zeros((mesh.ng, 2))
 mesh.F_BC = numpy.zeros((mesh.ng, 2))
@@ -62,7 +71,7 @@ mesh.F_BC[:, 0] = 0.25*(physics.group_planck(mesh, T_bound))[:, 0]
 
 kappa   = group_FC_opacity(mesh, T_prev, k_star)
 
-Cv    = FC_heatcap(1.0/mesh.K, mesh)
+Cv    = FC_heatcap(1/mesh.K, mesh)
 Q     = numpy.zeros((mesh.ng, mesh.nx))
 
 
@@ -75,8 +84,12 @@ sol_prev.intensity[:,:] = tools.dbl(physics.group_planck(mesh, T_prev))
 
 
 # Plot and compare to FC IMC results
-T_out, I_out, acc_iters = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=True)
-# T_out, I_out, unacc_iters = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=False)
+T_out, I_out, acc_iters = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=True, Newton=False)
+T_out, I_out, unacc_iters = method.solve_diffusion(mesh, scale, group_FC_opacity, sol_prev, T_prev, Cv, accelerated=False, Newton=False)
+
+print(f"{(1/mesh.C)*physics.ev_to_erg*numpy.sum(mesh.I_BC[:, 0], axis=0):.4e}")
+print("incoming energy density")
+
 
 time_vales_ct = mesh.t_stops[1:]*mesh.C
 time_labels = []
@@ -98,6 +111,7 @@ plt.title(f"Grey intensity over time")
 plt.xlabel("x [cm]")
 plt.legend(time_labels)
 plt.autoscale()
+plt.savefig("FC_grey_intensity.png")
 
 plt.figure()
 ax = plt.gca()
@@ -106,8 +120,10 @@ for i in range(0, len(mesh.t_stops)-1):
     tools.plot_LD_grey(ax, lines.grey_intensity)
 plt.title(f"Energy density over time")
 plt.xlabel("x [cm]")
+plt.ylabel("E [erg/cm3]")
 plt.legend(time_labels)
 plt.autoscale()
+plt.savefig("FC_energy_density.png")
 
 
 
@@ -120,41 +136,46 @@ plt.legend()
 plt.xlabel("x [cm]")
 plt.ylabel("T [eV]")
 plt.title("Temperature over time")
+plt.savefig("FC_temp_wide.png")
 
 
-# s = numpy.sum(mesh.nt)
-# plt.figure()
-# plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[1], label="Unaccelerated")
-# plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[1], label="Accelerated")
-# plt.xlabel("ct [cm]")
-# plt.ylabel("count")
-# plt.title("Inner Iterations")
-# plt.legend()
+s = numpy.sum(mesh.nt)
+plt.figure()
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[1], label="Unaccelerated")
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[1], label="Accelerated")
+plt.xlabel("ct [cm]")
+plt.ylabel("count")
+plt.title("Inner Iterations")
+plt.legend()
+plt.savefig("FC_inners.png")
 
-# plt.figure()
-# plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[0], label="Unaccelerated")
-# plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[0], label="Accelerated")
-# plt.xlabel("ct [cm]")
-# plt.ylabel("count")
-# plt.title("Outer Iterations")
-# plt.legend()
+plt.figure()
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[0], label="Unaccelerated")
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[0], label="Accelerated")
+plt.xlabel("ct [cm]")
+plt.ylabel("count")
+plt.title("Outer Iterations")
+plt.legend()
+plt.savefig("FC_outers.png")
 
-# plt.figure()
-# plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[0], label="Outer Iterations")
-# plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[1], label="Inner Iterations")
-# plt.xlabel("ct [cm]")
-# plt.ylabel("count")
-# plt.title("Uanccelerated Solve")
-# plt.legend()
-# lim = plt.gca().get_ylim()
+plt.figure()
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[0], label="Outer Iterations")
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, unacc_iters[1], label="Inner Iterations")
+plt.xlabel("ct [cm]")
+plt.ylabel("count")
+plt.title("Uanccelerated Solve")
+plt.legend()
+lim = plt.gca().get_ylim()
+plt.savefig("FC_unacc_iters.png")
 
-# plt.figure()
-# plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[0], label="Outer Iterations")
-# plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[1], label="Inner Iterations")
-# plt.xlabel("ct [cm]")
-# plt.ylabel("count")
-# plt.title("Accelerated Solve")
-# plt.legend()
-# plt.ylim(lim)
+plt.figure()
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[0], label="Outer Iterations")
+plt.plot(mesh.C*numpy.linspace(1, s, s)*mesh.dt, acc_iters[1], label="Inner Iterations")
+plt.xlabel("ct [cm]")
+plt.ylabel("count")
+plt.title("Accelerated Solve")
+plt.legend()
+plt.ylim(lim)
+plt.savefig("FC_accelerated_wide.png")
 
 plt.show()

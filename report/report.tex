@@ -9,9 +9,11 @@
 \usepackage{cancel}
 \usepackage{xcolor}
 
+\usepackage{float}
 
 \usepackage{algpseudocode}
 \usepackage{algorithm}
+\usepackage{subcaption}
 
 \usepackage{dirtree}
 
@@ -501,76 +503,7 @@ The global matrix is then a $(4N_x \times 4N_x)$ square matrix. In the Python im
     \end{bmatrix}.
 \end{equation}
 
-In the Python code, the global matrix assembly from local matrices is performed by the function {\pythoninline/method.assemble_global_matrix()/}, and the matrix definition can be found in {\pythoninline/tools/}. For example, the interior assembly:
-
-\begin{pythoncode}
-    # interior elements
-    for i in range(1, nx-1):
-        R_prev = (2*i)-1
-        L_next = (2*i)+2
-        shift  = (2*nx)
-
-        # zeroth moment, intensity
-        global_matrix[2*i:(2*i + 2), 
-                R_prev:L_next+1] += B_1 + (sigma[i]*dx*M_wide)
-        # zeroth moment, flux
-        global_matrix[2*i:2*i + 2, 
-                        R_prev+shift:L_next+shift+1] += B_2
-
-        # first moment, intensity
-        global_matrix[2*i +shift:2*i + 2+shift, 
-                      R_prev:L_next+1] += D[i] * (B_2) 
-        # first moment, flux
-        global_matrix[2*i+shift:2*i+2+shift,
-                      R_prev+shift:L_next+1+shift]+= (dx*M_wide 
-                                                        + D[i]*3*B_1)
-\end{pythoncode}
-
-and the boundary element assembly:
-
-\begin{pythoncode}
-    # Left boundary
-    # zeroth, intensity
-    global_matrix[0:2, 0:3] += B_1[:, 1:] + (sigma[0]*dx*M_wide[:, 1:])
-    # zeroth, flux
-    global_matrix[0:2, shift:3+shift] +=  B_2[:, 1:]
-    # first, intensity
-    global_matrix[shift:2+shift, 
-                  0:3] += D[0] * (B_2[:, 1:]) 
-    # first, flux
-    global_matrix[shift:2+shift,
-                  shift:3+shift] += ((dx*M_wide[:, 1:]) +
-                                               (D[0]*3*B_1[:, 1:]))
-    # Right boundary
-    # zeroth, intensity
-    global_matrix[shift-2:shift, 
-                  shift-3:shift] += (B_1[:, 0:-1] + 
-                                     (sigma[-1]*dx*M_wide[:, 0:-1]))
-    # zeroth, flux
-    global_matrix[shift-2:shift, 
-                  -3:] +=  B_2[:, 0:-1] 
-    # first, intensity
-    global_matrix[-2:, 
-                  shift-3:shift] += D[-1] * (B_2[:, 0:-1] ) 
-    # first, flux
-    global_matrix[-2:, 
-                  -3:] += ((dx*M_wide[:, 0:-1]) + 
-                                        (D[-1]*3*B_1[:, 0:-1]))
-\end{pythoncode}
-
-where the local matrices are
-
-\begin{pythoncode}
-B_1 = numpy.array([[-0.25, 0.25, 0,     0   ],
-                   [ 0,    0,    0.25, -0.25]])
-B_2 = numpy.array([[-0.5, 0,   0.5, 0  ],
-                   [ 0,  -0.5, 0,   0.5]])
-
-M    = (1/6)* numpy.array([[2,1],
-                           [1,2]])
-M_wide = (1/6)*numpy.array([[0, 2, 1, 0],
-                            [0, 1, 2, 0]])
-\end{pythoncode}
+In the Python code, the global matrix assembly from local matrices is performed by the function {\pythoninline/method.assemble_global_matrix()/}, and the matrix definition can be found in {\pythoninline/tools/}.
 
 \subsection{Unaccelerated Iteration}
 
@@ -596,6 +529,7 @@ and, within {\pythoninline/unaccelerated_loop()/}:
 The function {\pythoninline/assemble_HO()/} calls {\pythoninline/assemble_global_matrix()/} to assemble the global matrix as described above, and calls {\pythoninline/get_HO_source()/} to compute the source as a function of the previous iterate and apply the boundary conditions.
 
 The number of iterations is output with the solution once convergence is reached. The number of linear solves is equal to {\pythoninline/iters * mesh.ng/}.
+
 
 
 \subsection{Accelerated Iteration}
@@ -634,13 +568,12 @@ The full directory for the Python code can be found in \autoref{sec:tree}.
 
 % \subsection{Fourier Analysis and Convergence}
 
-\section{Tests}
-\subsection{Fleck and Cummings Test}
+\section{Fleck and Cummings Test}
 
-The Fleck and Cummings Test \cite{fleck1971implicit} is a slab with $X=4$ cm, and opacity defined by
+The Fleck and Cummings Test~\cite{fleck1971implicit} is a slab with $X=4$ cm, and opacity defined by
 
 \begin{equation}
-    \varkappa_\nu(T) = \frac{\varkappa_0}{(h\nu)^3}\left(1 - e^{-\frac{h\nu}{kT}} \right)
+    \varkappa_\nu(T) = \frac{\varkappa_0}{{(h\nu)}^3}\left(1 - e^{-\frac{h\nu}{kT}} \right)
 \end{equation}
 
 where $h\nu$ and $kT$ are in keV. At the left boundary, 
@@ -676,42 +609,197 @@ For the diffusion problem, these conditions become:
     F^{in, -} = -\int_{0}^{-1}\mu\I(\mu)|_{x=0} d\mu = -\frac{1}{4}\beta_k (T_b)
 \end{gather}
 
-\subsection{Test A1, steady-state solution}
+All results displayed here were generated using a tolerance of $\epsilon=1\times 10^{-4}$ (see \autoref{alg:accelerated}).
 
-The opacity and initial condition for this test are the same as for the Fleck and Cummings test, but with different boundary conditions. The initial radiation and temperature distribution remain
 
-\begin{gather}
-    T(x)|_{t=0} = T_0\\
-    \I_\nu |_{t=0} = B_\nu (T_0)
-\end{gather}
 
-and the boundary conditions are
+Without flux-limiting the diffusion, the results of the radiative diffusion model are very poor, described further in \autoref{sec:issues}. The results of the unmodified Fleck and Cummings test are displayed in \autoref{fig:FCresults}. The iteration counts are displayed in \autoref{fig:FC_iters}.
 
-\begin{gather}
-    \I_\nu|_{x=0, \mu > 0} = B_\nu(T_0)\\
-    \I_\nu|_{x=X, \mu < 0} = B_\nu(T_0).
-\end{gather}
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/FC_energy_density.png}
+        \caption{Energy Density}
+    \end{subfigure}
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/FC_grey_intensity.png}
+        \caption{Grey Intensity}
+    \end{subfigure}
 
-Then, for the diffusion method, this becomes
+    \begin{subfigure}[t]{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/FC_temp_wide.png}
+        \caption{Temperature, shown with FC IMC results (points)}\label{subfig:fc_temperature}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/FC_temp_zoom.png}
+        \caption{Temperature, cropped}
+    \end{subfigure}
+  \caption{Fleck and Cummings Test Results}\label{fig:FCresults}
+\end{figure}
 
-\begin{gather}
-    I^{in, +}= \frac{1}{2}\beta_k(T_0)\\
-    I^{in, -}= \frac{1}{2}\beta_k(T_0)\\
-    F^{in, +}= \frac{1}{4}\beta_k(T_0)\\
-    F^{in, -}= -\frac{1}{4}\beta_k(T_0)\\
-    I(x)|_{t=0} = \beta_k(T_0)\\
-    F(x)|_{t=0} = 0.
-\end{gather}
 
-\subsection{Test A2, one group}
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/FC_outers.png}
+        \caption{Outer Iterations}
+    \end{subfigure}
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/FC_inners.png}
+        \caption{Inner Iterations}
+    \end{subfigure}
 
-\subsection{Fourier-informed tests}
+    \begin{subfigure}[t]{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/FC_unacc_iters.png}
+        \caption{Unaccelerated Iterations}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/FC_accelerated_wide.png}
+        \caption{Accelerated Iterations}
+    \end{subfigure}
+
+    \begin{subfigure}[t]{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/FC_accelerated_zoom.png}
+        \caption{Accelerated Iterations (cropped)}
+    \end{subfigure}
+  \caption{Fleck and Cummings Test Iteration Results}\label{fig:FC_iters}
+\end{figure}
+
+
+The effects of these problems are not as strong when the initial temperature $T_b$ is high (i.e, the flux gradient and temperature changes are lower). Results for the same test where $T_b$ is set to $100$ eV are displayed in \autoref{fig:modifiedFC100}. Iterations are displayed in \autoref{fig:modifiedFC_iters}.
+
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/modifiedFC_energy_density.png}
+        \caption{Energy Density}
+    \end{subfigure}
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/modifiedFC_grey_intensity.png}
+        \caption{Grey Intensity}
+    \end{subfigure}
+
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/modfiedFC_temp_wide.png}
+        \caption{Temperature}
+    \end{subfigure}
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/modfiedFC_temp_zoom.png}
+        \caption{Temperature, cropped}
+    \end{subfigure}
+  \caption{Modified FC Test results with $T_b= 100$ eV}\label{fig:modifiedFC100}
+\end{figure}
+
+In both cases, the steady-state solution closely matches the IMC results~\cite{fleck1971implicit}, indicating that the basic transport solution method is correct, but that the issues are in the initial time steps, when the issues described in \autoref{sec:issues} cause the temperature, and thus the intensity solution, to blow up.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/modifiedFC_outers.png}
+        \caption{Outer Iterations}
+    \end{subfigure}
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/modifiedFC_inners.png}
+        \caption{Inner Iterations}
+    \end{subfigure}
+
+    \begin{subfigure}[t]{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/modifiedFC_unacc_iters.png}
+        \caption{Unaccelerated Iterations}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/modifiedFC_accelerated_wide.png}
+        \caption{Accelerated Iterations}
+    \end{subfigure}
+
+    \begin{subfigure}[t]{0.48\textwidth}
+        \includegraphics[width=\linewidth]{images/modifiedFC_accelerated_zoom.png}
+        \caption{Accelerated Iterations (cropped)}
+    \end{subfigure}
+  \caption{Modified FC Test ($T_b = 100$ eV) Iteration Results}\label{fig:modifiedFC_iters}
+\end{figure}
+
+
+\section{Issues \& Next Steps} \label{sec:issues}
+
+The unphysical results produced by the method as-is are due to the steep gradient present on the left boundary of the Fleck and Cummings test.
+
+Two problems contribute to these results
+
+\begin{enumerate}
+    \item\label{item:gradient} The large gradient can lead to a negative energy density in the cell neighboring the boundary (see \autoref{fig:demo}). If this negative flux is low enough, it may cause the temperature in the next time step to become negative, in which case the Planck function is undefined and no further solution can be found.
+    \begin{itemize}
+        \item This issue may be solved either by implementing a negative temperature fix-up (set negative temperatures to some positive $\epsilon_T$) or by flux-limiting the diffusion solution.
+    \end{itemize}
+    \item\label{item:dbdt} The temperature change is implicit in the intensity calculation, using $\frac{\partial \beta}{\partial T}$, which is evaluated at the current time step. The actual value $\frac{\Delta \beta}{\Delta T}$ may be much different, especially at low temperatures where the magnitude of $\frac{\partial^2 \beta}{\partial T^2}$ is high (see \autoref{fig:dbdt_demo}). If the value of $\frac{\Delta \beta}{\Delta T}$ is too low, then the temperature change required to increase $\beta$ emission can be much too high; this is what causes the temperature blow-up in the Fleck and Cummings test (see \autoref{subfig:fc_temperature}).
+    \begin{itemize}
+        \item This issue may be addressed using Newton iteration to iteratively compute a more accurate $\frac{\Delta \beta}{\Delta T}$. This solution was explored in the code, but led to oscillatory iteration in some cases. The algorithm for this technique is shown in \autoref{alg:newton_lambda}.
+    \end{itemize}
+\end{enumerate}
+
+Both of these issues are not relevant in the original report~\cite{morel1985synthetic}, where the method was developed and demonstrated for diffusive problems. The sample problem used to demonstrate the method was a small slab of iron, with an external heat source $Q$ which was switched on and off, where the solution is expected to have slow temperature changes and no steep gradients in the intensity solution; neither of these features are true for the Fleck and Cummings test.
+
+
+\begin{algorithm}
+    \caption{Unaccelerated Algorithm using Newton Iteration for Implicit Temperature}\label{alg:newton_lambda}
+  \begin{algorithmic}[0]
+    % \Require{$x$ and $y$ are packed dna strings of equal length $n$}
+    \Statex{}
+    \While{$t^n \leq t^{end}$}
+      \Let{$n$}{$n+1$}
+      \State{Compute (lagged) temperature-dependent coefficients using $T\vert_{t=t^{n-1}}$}
+      \State{Compute initial $\lambda = \frac{\partial \beta}{\partial T}\vert_{t=t^{n-1}}$}
+
+    \While{$|\lambda^{(i)} - \lambda^{(i-1)}| > \epsilon_\lambda |\lambda^{(i-1)}|$}
+        \Let{$i$}{$i+1$}
+        \While{$\norm{I^{(l)} - I^{(l-1)}} > \epsilon_c\norm{I^{(l-1)}}$}
+        \Let{$l$}{$l+1$}
+        \Let{$I_k^{(l+1/2)}$}{Source iteration on $\eta\chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^{n+1}$ (\ref{eq:iterative_neutron}), using $\beta^n \approx \beta^{n-1} + \lambda^{(i)} \Delta T$}
+        \Let{$I_k^{n}$}{$I_k^{(l+1)}$}
+        \EndWhile{}
+        \Let{$\lambda^{(i)}$}{$\frac{\beta^{(n+1)} - \beta^{(n)}}{T^{(n+1)} - T^{(n)}}$}
+    \EndWhile{}
+      \While{$\norm{I^{(l)} - I^{(l-1)}} > \epsilon\norm{I^{(l-1)}}$}
+        \Let{$l$}{$l+1$}
+        \Let{$I_k^{(l+1/2)}$}{Source iteration on $\eta\chi_k \sum_{g=1}^{N_g}\sigma_{f, g}I_g^{n+1}$ (\ref{eq:iterative_neutron}), using $\beta^n \approx \beta^{n-1} + \lambda \Delta T$}
+      \EndWhile{}
+      \Let{$I_k^{n}$}{$I_k^{(l+1)}$}
+      \State{Recover $\Delta T^{n+1/2}$ from $I_k^{n}$ (\ref{eq:temperature-change})}
+      \If{$K \neq 0 \land u \neq 0$}
+        \State{Solve thermal diffusion equation for $\Delta T^{n+1}$}
+      \EndIf{}
+      \Let{$T^{n+1}$}{$T^n + \Delta T^{n+1/2} + \Delta T^{n+1}$}
+    \EndWhile{}
+  \end{algorithmic}
+\end{algorithm}
+
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\linewidth]{images/demo.png}
+    \caption{Negative flux illustration}\label{fig:demo}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.65\linewidth]{images/dbdt_demo.png}
+    \caption{Illustration of $\frac{\Delta \beta}{\Delta T}$}\label{fig:dbdt_demo}
+\end{figure}
+
+
+
+
 \newpage
 
 \appendix
 
-\section{Python Functions}
-\label{sec:tree}
+\section{Python Functions}\label{sec:tree}
 
 \newcommand{\descript}[1]{\dotfill \begin{minipage}[t]{5cm} #1 
 \end{minipage}\hspace{2.5cm}}
@@ -726,8 +814,9 @@ Then, for the diffusion method, this becomes
     .3 assemble\_LO().
     .3 unaccelerated\_loop()\descript{For a single time step. Call assemble\_HO and solve system until convergence is reached}.
     .3 accelerated\_loop()\descript{Same as unaccelerated\_loop(), but includes grey correction term. Assemble and solve HO system, compute grey coefficients, solve grey system, get corrected iterate, until convergence}.
+    .3 loop()\descript{Read flags and call appropriate ...loop()}.
     .3 update\_temperature()\descript{\autoref{eq:temperature-change}}.
-    .3 solve\_diffusion()\descript{handles time advancement. At each time step, call appropriate ...loop(), record results}.
+    .3 solve\_diffusion()\descript{handles time advancement. At each time step, call loop(), record results}.
     .2 tools\DTcomment{Data classes, plotting tools, local matrices}.
     .3 B\_1, B\_2, M, M\_wide\descript{Local LD matrices}.
     .3 dbl()\descript{Repeat mesh.nx array to be 2*mesh.nx. Prepares piecewise constant values (opacity, temperature, etc) for use in LD solution}.

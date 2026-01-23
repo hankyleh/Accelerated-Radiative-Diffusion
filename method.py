@@ -146,22 +146,33 @@ def assemble_LO(mesh : tools.Discretization, coeff : tools.Grey_coeff):
 def unaccelerated_loop(mesh : tools.Discretization, 
                        sol_prev : tools.Transport_solution, 
                        coeff : tools.MG_coefficients, 
-                       flags : dict):
+                       flags : dict,
+                       guess  = None):
 
-    last_iteration = copy.deepcopy(sol_prev)
+    if guess is None:
+        last_iteration = copy.deepcopy(sol_prev)
+    else:
+        last_iteration = guess
     updated_solution =  copy.deepcopy(sol_prev)
     
     change = [1]
 
+    if flags["coarse"] is True:
+        gmtol = mesh.eps
+        tol = mesh.eps_c
+    else:
+        gmtol = mesh.eps_f
+        tol   = mesh.eps
+
     iter = 0
-    while (numpy.max(change) > mesh.eps) :
+    while (numpy.max(change) > tol) :
         iter += 1
         for k in range(0, mesh.ng):
             sys = assemble_HO(mesh, coeff, last_iteration.intensity, k)
             if flags["mat_method"] == "lu":
                 updated_solution.vec[k, :] = sparse.linalg.spsolve(sys.mat, sys.src)
             elif flags["mat_method"] == "gmres":
-                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
+                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = gmtol)
             elif flags["mat_method"] == "inv":
                 updated_solution.vec[k, :] = numpy.matmul(scipy.linalg.inv(sys.mat.todense()), sys.src)
             else:
@@ -200,10 +211,14 @@ def unaccelerated_loop(mesh : tools.Discretization,
 def accelerated_loop(mesh : tools.Discretization, 
                        sol_prev : tools.Transport_solution, 
                        coeff : tools.MG_coefficients, 
-                       flags : dict):
+                       flags : dict,
+                       guess  = None):
 
     I_prev = sol_prev.intensity[:]
-    last_iteration = copy.deepcopy(sol_prev)
+    if guess is None:
+        last_iteration = copy.deepcopy(sol_prev)
+    else:
+        last_iteration = guess
     updated_solution =  copy.deepcopy(sol_prev)
     error_soln = copy.deepcopy(sol_prev)
 
@@ -211,8 +226,15 @@ def accelerated_loop(mesh : tools.Discretization,
     
     change = [1]
 
+    if flags["coarse"] is True:
+        gmtol = mesh.eps
+        tol = mesh.eps_c
+    else:
+        gmtol = mesh.eps_f
+        tol   = mesh.eps
+
     iter = 0
-    while (numpy.max(change) > mesh.eps) :
+    while (numpy.max(change) > tol):
         iter += 1
 
         for k in range(0, mesh.ng):
@@ -220,21 +242,19 @@ def accelerated_loop(mesh : tools.Discretization,
             if flags["mat_method"] == "lu":
                 updated_solution.vec[k, :] = sparse.linalg.spsolve(sys.mat, sys.src)
             elif flags["mat_method"] == "gmres":
-                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
+                updated_solution.vec[k, :], b = sparse.linalg.gmres(sys.mat, sys.src, x0=last_iteration.vec[k], rtol = gmtol)
             elif flags["mat_method"] == "inv":
                 updated_solution.vec[k, :] = numpy.matmul(scipy.linalg.inv(sys.mat.todense()), sys.src)
             else:
                 raise ValueError("Invalid solution method provided")
         
         grey_constants.assign(mesh, coeff, updated_solution, last_iteration)
-
-
         sys_grey = assemble_LO(mesh, grey_constants)
 
         if flags["mat_method"] == "lu":
             error_soln.vec[:] = sparse.linalg.spsolve(sys_grey.mat, sys_grey.src)
         elif flags["mat_method"] == "gmres":
-            error_soln.vec[:], b = sparse.linalg.gmres(sys_grey.mat, sys_grey.src, x0=last_iteration.vec[k], rtol = 0.01*mesh.eps)
+            error_soln.vec[:], b = sparse.linalg.gmres(sys_grey.mat, sys_grey.src, x0=last_iteration.vec[k], rtol = gmtol)
         elif flags["mat_method"] == "inv":
             error_soln.vec[:] = numpy.matmul(scipy.linalg.inv(sys_grey.mat.todense()), sys_grey.src)
         else:
@@ -251,13 +271,13 @@ def accelerated_loop(mesh : tools.Discretization,
         last_iteration = copy.deepcopy(updated_solution)
 
         def print_update():
-            print(f"Step {flags["time_frac"]:<8}"+
+            print(f"\rStep {flags["time_frac"]:<8}"+
                   f"Iteration {iter:<6}"+
                   f"Max. rel. change {numpy.max(change):.4e}  "+
                   f"{"MANUALLY ASSIGNED OPACITY" * (flags["manual_kappa"] is not False)}"+
                   f"'{flags["mat_method"]}' LD solution method  "+
-                  f"{"Using Accelerated Algorithm"*(flags["accelerated"] is not False)}",
-                        end="\r", flush=True)
+                  f"{"Using Accelerated Algorithm"*(flags["accelerated"] is not False)}", 
+                  end = "", flush=True)
 
         if iter % flags["printing_interval"] == 0:
             print_update()
@@ -265,6 +285,20 @@ def accelerated_loop(mesh : tools.Discretization,
     print_update()
     return updated_solution.vec, iter
 
+
+def loop(mesh : tools.Discretization, 
+         sol_prev : tools.Transport_solution, 
+         coeff : tools.MG_coefficients, 
+         flags : dict,
+         guess = None):
+
+    if flags["accelerated"] == True:
+        transport_sol, inners  = accelerated_loop(mesh, sol_prev, coeff, flags, guess)
+    else:
+        transport_sol, inners  = unaccelerated_loop(mesh, sol_prev, coeff, flags, guess)
+
+    return transport_sol, inners
+    
 
 def update_temperature(mesh : tools.Discretization, 
                        coeff : tools.MG_coefficients, 
@@ -277,6 +311,28 @@ def update_temperature(mesh : tools.Discretization,
     )/(
         (Cv/mesh.dt) + numpy.sum(coeff.kappa * coeff.db_dt, axis=0)
     )
+
+    # if (sum(math.isnan(temp_change[j]) for j in range(0, mesh.nx)) > 0):
+    #     print(temp_change[:])
+    #     print("temp change")
+    #     print(coeff.kappa[:, 0:3])
+    #     print("kappa sample")
+    #     # print(soln.cell_center_i[0:6, 0:6])
+    #     # print("cell center i sample")
+    #     # print(coeff.beta[0:6, 0:6])
+    #     # print("beta sample")
+    #     print((Cv/mesh.dt) + numpy.sum(coeff.kappa * coeff.db_dt, axis=0))
+    #     print("denominator")
+    #     print( numpy.sum(coeff.kappa * (soln.cell_center_i - coeff.beta), axis=0) + Q)
+    #     print("numerator")
+    #     print(numpy.sum(coeff.kappa * coeff.db_dt, axis=0))
+    #     print("sum term")
+    #     print(coeff.db_dt[:, 0:3])
+    #     print("dbdt")
+
+    #     raise ValueError("NaN dT encountered")
+    
+
     return temp_change
 
 def solve_diffusion(mesh : tools.Discretization, 
@@ -294,7 +350,9 @@ def solve_diffusion(mesh : tools.Discretization,
                         mat_method = "lu",
                         printing_interval = 5,
                         print_coeff = False,
-                        print_iter_change = False):
+                        print_iter_change = False,
+                        coarse = False,
+                        Newton = True):
     print("Beginning unaccelerated iteration")
 
     flags = {
@@ -306,7 +364,8 @@ def solve_diffusion(mesh : tools.Discretization,
         "mat_method"     : mat_method,
         "printing_interval" : printing_interval,
         "print_coeff"    : print_coeff,
-        "print_iter_change" : print_iter_change
+        "print_iter_change" : print_iter_change,
+        "coarse" : coarse
     }
 
     dt = mesh.dt
@@ -321,23 +380,23 @@ def solve_diffusion(mesh : tools.Discretization,
     transport_iters = copy.deepcopy(IC)
     sol_prev = copy.deepcopy(IC)
 
-    T_iter = copy.deepcopy(T_init)
+    T_n = copy.deepcopy(T_init)
 
     kappa = numpy.zeros((mesh.ng, mesh.nx))
-    change = numpy.zeros(mesh.nx)
+    dT = numpy.zeros(mesh.nx)
+    beta = copy.deepcopy(dT)
 
-    
-    print("unaccelerated method")
     for stop in range(0, (first_step_only == False)*len(nt) 
                         + (first_step_only == True)):
 
         print(f"Starting steps towards {mesh.t_stops[stop]}")
 
         for step in range(0, nt[stop]):
+            inners = 0
             flags["time_frac"] = f"{(step + numpy.sum(mesh.nt[0:stop])) + 1}/{numpy.sum(mesh.nt)}"
 
             if manual_kappa is False:
-                kappa[:] = opacity(mesh, T_iter, k_star)
+                kappa[:] = opacity(mesh, T_n, k_star)
             else:
                     kappa[:] = manual_kappa
             if print_kappa is True:
@@ -345,7 +404,7 @@ def solve_diffusion(mesh : tools.Discretization,
                     print("Group opacity in first cell")
 
             coeff = tools.MG_coefficients(mesh)
-            coeff.assign(mesh, kappa, sol_prev, T_iter, Cv, Q)
+            coeff.assign(mesh, kappa, sol_prev, T_n, Cv, Q)
 
             if print_coeff is True:
                 print()
@@ -361,40 +420,123 @@ def solve_diffusion(mesh : tools.Discretization,
                 print(coeff.sig_f[:, -1])
                 print("sig_f, first cell; last cell")
 
-            if accelerated == True:
-                transport_iters.vec[:,:], inners  = accelerated_loop(mesh, sol_prev, coeff, flags)
-            else:
-                transport_iters.vec[:,:], inners  = unaccelerated_loop(mesh, sol_prev, coeff, flags)
+
+            def check_nan(mesh : tools.Discretization, soln : tools.Transport_solution, prev = None):
+                if (sum(math.isnan(soln.intensity[i, j]) for i in range (0, mesh.ng) for j in range(0, 2*mesh.nx)) > 0):
+                    print(soln.intensity)
+                    print("Cell-edge flux")
+                    print(soln.vec[0:6, 0:6])
+                    print("Sample of transport solution")
+                    print(soln.cell_center_i)
+                    print("Cell-centered flux")
+                    print(kappa[:, 0:6])
+                    print("opacity sample")
+                    print(T_n[:])
+                    print("Temperature")
+                    print(dT[:])
+                    print("most recent temperature change")
+
+                    plt.figure()
+                    ax = plt.gca()
+                    lines = tools.LD_plottable(mesh, (1/mesh.C)*physics.ev_to_erg*soln.vec)
+                    tools.plot_LD_groups(ax, mesh, lines.intensity, range(0, mesh.ng))
+                    plt.title(f"Energy density")
+                    plt.xlabel("x [cm]")
+                    plt.autoscale()
+
+
+                    plt.figure()
+                    plt.plot(mesh.cell_centers, mesh.K*T_n)
+                    plt.xlabel("x [cm]")
+                    plt.ylabel("T [eV]")
+                    plt.title("Temperature")
+
+                    if prev is not None:
+                        print(prev.vec[0:6, 0:6])
+                        print("previous solution sample")
+                        print()
+                        plt.figure()
+                        ax = plt.gca()
+                        lines = tools.LD_plottable(mesh, (1/mesh.C)*physics.ev_to_erg*prev.vec)
+                        tools.plot_LD_groups(ax, mesh, lines.intensity, range(0, mesh.ng))
+                        plt.title(f"Previous iteration Energy density")
+                        plt.xlabel("x [cm]")
+                        plt.autoscale()
+
+                    plt.show()
+                    raise ValueError("NaN intensity encountered")
+                return 0
+
+            if Newton is True:
+                alpha = 0.05
+                dbdt = coeff.db_dt
+                slope = numpy.zeros((mesh.ng, mesh.nx))
+
+                slope_change = 1
+                slope_iters = 0
+                # iterate until slope is good
+
+                # check dT first
+                transport_iters.vec[:,:], new_inners = loop(mesh, sol_prev, coeff, flags, guess = transport_iters)
+                inners += new_inners
+                dT[:] = update_temperature(mesh, coeff, transport_iters, Cv)
+                if numpy.linalg.norm(dT/T_n, 2) > alpha:
+                    while (slope_change > mesh.eps_c):
+                        slope_iters += 1
+                        flags["coarse"] = True
+                        temporary_transport = copy.deepcopy(transport_iters)
+                        transport_iters.vec[:,:], new_inners = loop(mesh, sol_prev, coeff, 
+                                                                    flags, guess = transport_iters)
+                        check_nan(mesh, transport_iters, prev=temporary_transport)
+                        inners += new_inners
+                        dT[:] = update_temperature(mesh, coeff, transport_iters, Cv)
+                        dBeta = physics.group_planck(mesh, (T_n + dT)) - coeff.beta
+                        slope = dBeta / dT
+                        change_vec = numpy.sum(numpy.abs( (slope / coeff.db_dt)-1 ),axis=0)
+                        change_vec = numpy.nan_to_num(change_vec)
+                        slope_change = numpy.max(change_vec)
+                        if slope_iters > 40:
+                            # TODO : temporary fix for no convergence.
+                            # FIND OUT WHY THIS IS OCCURING
+                            print("No Newton convergence")
+                            coeff.db_dt[:, :] = dbdt
+                            break
+
+                        print()
+                        print(slope_change)
+                        print("slope change")
+                        coeff.db_dt[:, :] = slope
+                else:
+                    pass
+                    # dT was small; use dB/dT|_n
+                # finish iterations using new slope
+                flags["coarse"] = coarse
+
+
+            # calculate flux and intensity, record iterations
+            temporary_transport = copy.deepcopy(transport_iters)
+            transport_iters.vec[:,:], new_inners = loop(mesh, sol_prev, coeff, 
+                                                        flags, guess = transport_iters)
+            check_nan(mesh, transport_iters, prev = temporary_transport)
+            inners += new_inners
             sol_prev.vec[:] = transport_iters.vec[:].copy()
 
-            if (sum(math.isnan(transport_iters.cell_center_i[i, j]) for i in range (0, mesh.ng) for j in range(0, mesh.nx)) > 0):
-                print(transport_iters.intensity)
-                print("Cell-edge flux")
-                print(transport_iters.vec[0:6, 0:6])
-                print("Sample of transport solution")
-                print(transport_iters.cell_center_i)
-                print("Cell-centered flux")
-                print(kappa[:, 0:6])
-                print("opacity sample")
-                raise ValueError("NaN intensity encountered")
+            
             
             if accelerated == True:
                 iters_log[:,step + numpy.sum(mesh.nt[0:stop])] = inners * numpy.array([1, mesh.ng + 1]).transpose()
             else:
                 iters_log[:,step + numpy.sum(mesh.nt[0:stop])] = inners * numpy.array([1, mesh.ng]).transpose()
 
-            # print("")
-            # print(iters_log)
                 
-            change[:] = update_temperature(mesh, coeff, transport_iters, Cv)
+            dT[:] = update_temperature(mesh, coeff, transport_iters, Cv)
             if print_T_change == True:
-                print(change)
+                print(dT)
                 print("Temperature delta")
-            T_iter += copy.deepcopy(change[:])
-            coeff.assign(mesh, kappa, transport_iters, T_iter, Cv, Q)
+            T_n += copy.deepcopy(dT[:])
+            coeff.assign(mesh, kappa, transport_iters, T_n, Cv, Q)
             print("")
         transport_output.append(copy.deepcopy(transport_iters))
-        temp_output.append(copy.deepcopy(T_iter[:]))
+        temp_output.append(copy.deepcopy(T_n[:]))
     
     return temp_output, transport_output, iters_log
-
