@@ -249,8 +249,6 @@ def accelerated_loop(mesh : tools.Discretization,
                 raise ValueError("Invalid solution method provided")
         
         grey_constants.assign(mesh, coeff, updated_solution, last_iteration)
-
-
         sys_grey = assemble_LO(mesh, grey_constants)
 
         if flags["mat_method"] == "lu":
@@ -301,9 +299,6 @@ def loop(mesh : tools.Discretization,
 
     return transport_sol, inners
     
-
-
-
 
 def update_temperature(mesh : tools.Discretization, 
                        coeff : tools.MG_coefficients, 
@@ -391,8 +386,6 @@ def solve_diffusion(mesh : tools.Discretization,
     dT = numpy.zeros(mesh.nx)
     beta = copy.deepcopy(dT)
 
-    
-    print("unaccelerated method")
     for stop in range(0, (first_step_only == False)*len(nt) 
                         + (first_step_only == True)):
 
@@ -547,4 +540,3 @@ def solve_diffusion(mesh : tools.Discretization,
         temp_output.append(copy.deepcopy(T_n[:]))
     
     return temp_output, transport_output, iters_log
-
